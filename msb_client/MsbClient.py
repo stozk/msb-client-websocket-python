@@ -10,12 +10,29 @@ See the file "LICENSE" for the full license governing this code.
 import websocket, threading, json, jsonschema, jsonpickle, ssl, time, uuid, os, logging
 from random import randint
 import datetime
+import queue
 
 from .Event import Event
 from .ComplexDataFormat import ComplexDataFormat
 from .Function import Function
 from .DataFormat import getDataType
 
+# queue used to send msb function calls from websocket thread to be executed in main thred
+ws_callback_queue = queue.Queue()
+
+def from_ws_thread(func_to_call_from_main_thread):
+    print("Adding to queue ...")
+    ws_callback_queue.put(func_to_call_from_main_thread)
+
+def from_main_thread_nonblocking():
+    while True:
+        try:
+            callback = ws_callback_queue.get(False) # doesn't block main thread
+        except queue.Empty: # raised when queue is empty
+            # print("Nothing in queue ...")
+            break
+        print("Callback execution from queue ...")
+        callback()
 
 class MsbClient(websocket.WebSocketApp):
     """Definition of the msb client to handle the creation of the self-description
@@ -192,9 +209,9 @@ class MsbClient(websocket.WebSocketApp):
                     jmsg["functionParameters"]["correlationId"] = jmsg["correlationId"]
                 else:
                     logging.debug("correlationid could not be found. Does the websocket interface version support it?")
-                self.functions[jmsg["functionId"]].implementation(
+                from_ws_thread(lambda: self.functions[jmsg["functionId"]].implementation(
                     jmsg["functionParameters"]
-                )
+                ))
             else:
                 logging.warning("Function could not be found: " + jmsg["functionId"])
         elif message.startswith("K"):
