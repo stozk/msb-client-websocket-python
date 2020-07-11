@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0
 See the file "LICENSE" for the full license governing this code.
 """
 
-import websocket, threading, json, jsonschema, jsonpickle, ssl, time, uuid, os, logging
+import websocket, threading, json, jsonschema, jsonpickle, ssl, time, uuid, os, logging, enum
 from random import randint
 import datetime
 
@@ -16,6 +16,11 @@ from .ComplexDataFormat import ComplexDataFormat
 from .Function import Function
 from .DataFormat import getDataType
 
+@jsonpickle.handlers.register(enum.Enum, base=True)
+class EnumHandler(jsonpickle.handlers.BaseHandler):
+
+    def flatten(self, obj, data):
+        return obj.value  # Convert to json friendly format
 
 class MsbClient(websocket.WebSocketApp):
     """Definition of the msb client to handle the creation of the self-description
@@ -29,7 +34,7 @@ class MsbClient(websocket.WebSocketApp):
         name=None,
         description=None,
         token=None,
-        applicationPropertiesCustomPath=None
+        applicationPropertiesCustomPath=None,
     ):
         """Initializes a new msb client.
 
@@ -81,6 +86,7 @@ class MsbClient(websocket.WebSocketApp):
         self.events = {}
         self.configuration = {}
         self.configuration["parameters"] = {}
+        self.metaData = []
 
         # // socket
         self.ws = None
@@ -596,6 +602,9 @@ class MsbClient(websocket.WebSocketApp):
         if eventId in self.events:
             self.events[eventId].dataObject = eventValue
 
+    def addMetaData(self, metaData):
+        self.metaData.append(metaData)
+
     def publish(
         self,
         eventId,
@@ -783,8 +792,10 @@ class MsbClient(websocket.WebSocketApp):
         self_description["name"] = self.name
         self_description["description"] = self.description
         self_description["token"] = self.token
+        if self.metaData != []:
+            self_description["metaData"] = self.metaData
         _ev = []
-        e_props = ["@id", "id", "dataFormat", "description", "eventId", "name"]
+        e_props = ["@id", "id", "dataFormat", "description", "eventId", "name", "metaData"]
         for event in self.events:
             current_e_props = []
             e = jsonpickle.decode(
@@ -798,6 +809,11 @@ class MsbClient(websocket.WebSocketApp):
             del e["df"]
             if e["dataFormat"] is None:
                 del e["dataFormat"]
+            if e["metaData"] == []:
+                del e["metaData"]
+            # else:
+            #     for i in range(len(e["metaData"])):
+            #         e["metaData"][i] = json.dumps(e["metaData"][i])
             del e["isArray"]
             for key in list(e.keys()):
                 current_e_props.append(key)
