@@ -24,10 +24,10 @@ if __name__ == "__main__":
     """This is a sample client for the MSB python client library."""
     # define service properties as constructor parameters
     SERVICE_TYPE = "SmartObject"
-    SO_UUID = str(uuid.uuid1())
+    SO_UUID = "2cfa27f4-f19d-4244-8bd9-b91d4d70ad3c"
     SO_NAME = "MSBClientPythonAppSample" + SO_UUID[-6:]
     SO_DESCRIPTION = "MSBClientPythonAppSample description"
-    SO_TOKEN = SO_UUID[-6:]
+    SO_TOKEN = "b91d4d70ad3c"
     myMsbClient = MsbClient(
         SERVICE_TYPE,
         SO_UUID,
@@ -38,9 +38,9 @@ if __name__ == "__main__":
     # otherwise the application.properties file will be read
     # myMsbClient = MsbClient()
 
-    # msb_url = 'wss://localhost:8084'
+    msb_url = 'wss://localhost:8084'
     # msb_url = 'ws://localhost:8085'
-    msb_url = 'ws://ws2.msb.edu.virtualfortknox.de'
+    # msb_url = 'ws://ws2.msb.edu.virtualfortknox.de'
 
     # enable debug log messages (default = disabled).
     myMsbClient.enableDebug(True)
@@ -109,7 +109,7 @@ if __name__ == "__main__":
                                           "Umgebungstemperatur",
                                           TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001")))
 
-    event1.addMetaData("Feuchte")
+    event1.addTypeDescription(TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001"))
 
     # print(myMsbClient.objectToJson(event1))
 
@@ -212,8 +212,8 @@ if __name__ == "__main__":
     # )
 
     # define the function which will be passed to the function description
-    # def printMsg(msg):
-    #     print(str(msg["dataObject"]))
+    def printMsg(msg):
+        print(str(msg["dataObject"]))
 
     # define the function which will be passed to the function description
     # this example shows
@@ -236,11 +236,14 @@ if __name__ == "__main__":
     # parameter 5 (fnPointer:printMsg): pointer to the function implementation
     # parameter 6 (bool:optional): True if payload is an array of parameter 4
     # parameter 7 (list:optional): array of response events e.g. ['RESPONSE_EVENT1']
-    # function1 = Function(
-    #     "FUNCTION1", "Function1", "Function1_description", DataType.STRING, printMsg, True, []
-    # )
+    function1 = Function("FUNCTION1", "Function1", "Function1_description", DataType.STRING, printMsg, True, [])
     # add function objects to MSB client
-    # myMsbClient.addFunction(function1)
+    myMsbClient.addFunction(function1)
+
+    function1.addMetaData(MetaDataDefinition("Temperatur",
+                                          MetaDataType.CUSTOM,
+                                          "Umgebungstemperatur",
+                                          TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001")))
 
     # optionally, add function directly in line
     # this example has one response event.
@@ -351,11 +354,11 @@ if __name__ == "__main__":
     # myMsbClient.connect('wss://localhost:8084')
 
     # connect to server by defining server url in line, otherwise the application.properties file will be read
-    # myMsbClient.connect(msb_url)
+    myMsbClient.connect(msb_url)
     # myMsbClient.connect()
 
     # register client on MSB
-    # myMsbClient.register()
+    myMsbClient.register()
 
     # disconnect client from MSB
     # myMsbClient.disconnect()

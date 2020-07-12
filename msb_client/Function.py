@@ -27,6 +27,7 @@ class Function:
         fnpointer=None,
         isArray=False,
         responseEvents=None,
+        metaData=[]
     ):
         """Initializes a new function.
 
@@ -44,6 +45,7 @@ class Function:
         self.description = function_description
         self.implementation = fnpointer
         self.isArray = isArray
+        self.metaData = metaData
         if responseEvents is None:
             self.responseEvents = []
         else:
@@ -74,3 +76,6 @@ class Function:
                 self.dataFormat = json_object
             except Exception:
                 self.dataFormat = DataFormat(function_dataformat, isArray).getDataFormat()
+
+    def addMetaData(self, metaData):
+        self.metaData.append(metaData)
