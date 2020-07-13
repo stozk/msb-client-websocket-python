@@ -15,10 +15,10 @@ class TypeDescription(MetaData):
 
     def __init__(
             self,
+            type,
             id,
             location,
-            type,
-            selector=None,
+            selector="/",
             value=None
     ):
         """Initializes a new MetaData object.

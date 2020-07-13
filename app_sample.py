@@ -37,7 +37,8 @@ if __name__ == "__main__":
     # otherwise the application.properties file will be read
     # myMsbClient = MsbClient()
 
-    msb_url = 'wss://localhost:8084'
+    msb_url = 'wss://192.168.0.138:8084'
+    # msb_url = 'wss://localhost:8084'
     # msb_url = 'ws://localhost:8085'
     # msb_url = 'ws://ws2.msb.edu.virtualfortknox.de'
 
@@ -109,12 +110,12 @@ if __name__ == "__main__":
                                       TypeDescription(TypeDescriptor.CDD,
                                                       "0112/2///61987#ABT514#001",
                                                       "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514"),
-                                      "EVENT1"))
+                                      "/EVENT1"))
 
     event1.addMetaData(TypeDescription("0112/2///61987#ABT514#001",
                                        "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
                                        TypeDescriptor.CDD,
-                                       "EVENT1"))
+                                       "/EVENT1"))
 
     # print(myMsbClient.objectToJson(event1))
 
@@ -250,7 +251,7 @@ if __name__ == "__main__":
                                           TypeDescription(TypeDescriptor.CUSTOM,
                                                           "0112/2///61987#ABT514#001",
                                                           "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514"),
-                                         "FUNCTION1"))
+                                         "/FUNCTION1"))
 
     # optionally, add function directly in line
     # this example has one response event.

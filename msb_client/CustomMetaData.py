@@ -18,7 +18,7 @@ class CustomMetaData(MetaData):
             name,
             description,
             typeDescription=None,
-            selector=None,
+            selector="/",
             value=None,
             dataFormat=None
     ):
