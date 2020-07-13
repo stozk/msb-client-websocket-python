@@ -15,6 +15,7 @@ from enum import Enum
 class TypeDescriptor(str, Enum):
     """Enum of all supported type desciptors."""
     ECLASS = 'ECLASS'
+    CDD = 'CDD'
     ETIM = 'ETIM'
     UNSPC = 'UNSPC'
     AAS = 'AAS'

@@ -13,8 +13,7 @@ import uuid
 from msb_client.ComplexDataFormat import ComplexDataFormat
 from msb_client.DataType import DataType
 from msb_client.Event import Event
-from msb_client.MetaDataDefinition import MetaDataDefinition
-from msb_client.MetaDataType import MetaDataType
+from msb_client.CustomMetaData import CustomMetaData
 from msb_client.TypeDescription import TypeDescription
 from msb_client.TypeDescriptor import TypeDescriptor
 from msb_client.Function import Function
@@ -99,17 +98,23 @@ if __name__ == "__main__":
     # event1.addMetaData("Temperatur",
     #                    MetaDataDefinition())
 
-    myMsbClient.addMetaData(MetaDataDefinition("Temperatursensor",
-                                                          MetaDataType.CUSTOM,
-                                                          "Temperatursensor",
-                                                          TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001")))
+    myMsbClient.addMetaData(CustomMetaData("Temperatursensor",
+                                           "Temperatursensor",
+                                           TypeDescription(TypeDescriptor.CDD,
+                                                           "0112/2///61987#ABT514#001",
+                                                            "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514")))
 
-    event1.addMetaData(MetaDataDefinition("Temperatur",
-                                          MetaDataType.CUSTOM,
-                                          "Umgebungstemperatur",
-                                          TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001")))
+    event1.addMetaData(CustomMetaData("Temperatur",
+                                      "Umgebungstemperatur",
+                                      TypeDescription(TypeDescriptor.CDD,
+                                                      "0112/2///61987#ABT514#001",
+                                                      "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514"),
+                                      "EVENT1"))
 
-    event1.addTypeDescription(TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001"))
+    event1.addMetaData(TypeDescription("0112/2///61987#ABT514#001",
+                                       "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
+                                       TypeDescriptor.CDD,
+                                       "EVENT1"))
 
     # print(myMsbClient.objectToJson(event1))
 
@@ -240,10 +245,12 @@ if __name__ == "__main__":
     # add function objects to MSB client
     myMsbClient.addFunction(function1)
 
-    function1.addMetaData(MetaDataDefinition("Temperatur",
-                                          MetaDataType.CUSTOM,
-                                          "Umgebungstemperatur",
-                                          TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61987#ABT514#001")))
+    function1.addMetaData(CustomMetaData("Funktion_Temperatur",
+                                          "Funktion_Umgebungstemperatur",
+                                          TypeDescription(TypeDescriptor.CUSTOM,
+                                                          "0112/2///61987#ABT514#001",
+                                                          "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514"),
+                                         "FUNCTION1"))
 
     # optionally, add function directly in line
     # this example has one response event.
@@ -354,11 +361,11 @@ if __name__ == "__main__":
     # myMsbClient.connect('wss://localhost:8084')
 
     # connect to server by defining server url in line, otherwise the application.properties file will be read
-    myMsbClient.connect(msb_url)
+    # myMsbClient.connect(msb_url)
     # myMsbClient.connect()
 
     # register client on MSB
-    myMsbClient.register()
+    # myMsbClient.register()
 
     # disconnect client from MSB
     # myMsbClient.disconnect()

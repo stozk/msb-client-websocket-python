@@ -20,10 +20,10 @@ class MetaData:
 
     def __init__(
             self,
-            name,
-            value
+            value,
+            selector
     ):
         """Initializes a new MetaData object.
         """
-        self.name = name
         self.value = value
+        self.selector = selector

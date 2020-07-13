@@ -7,27 +7,25 @@ Licensed under the Apache License, Version 2.0
 See the file "LICENSE" for the full license governing this code.
 """
 
-import json
-import copy
-
-from .ComplexDataFormat import ComplexDataFormat
-from .DataFormat import DataFormat
-import datetime
+from .MetaData import MetaData
 
 
-class MetaDataDefinition:
+class CustomMetaData(MetaData):
     """Definition of functions to be provided via the MSB."""
 
     def __init__(
             self,
             name,
-            type,
             description,
-            dataFormat
+            typeDescription=None,
+            selector=None,
+            value=None,
+            dataFormat=None
     ):
         """Initializes a new MetaData object.
         """
-        self.type = type
+        super().__init__(value, selector)
         self.name = name
         self.description = description
         self.dataFormat = dataFormat
+        self.typeDescription = typeDescription

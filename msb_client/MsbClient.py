@@ -795,7 +795,7 @@ class MsbClient(websocket.WebSocketApp):
         if self.metaData != []:
             self_description["metaData"] = self.metaData
         _ev = []
-        e_props = ["@id", "id", "dataFormat", "description", "eventId", "name", "metaData", "typeDescription"]
+        e_props = ["@id", "id", "dataFormat", "description", "eventId", "name"]
         for event in self.events:
             current_e_props = []
             e = jsonpickle.decode(
@@ -809,11 +809,12 @@ class MsbClient(websocket.WebSocketApp):
             del e["df"]
             if e["dataFormat"] is None:
                 del e["dataFormat"]
-            if e["typeDescription"] == []:
-                del e["typeDescription"]
             if e["metaData"] == []:
                 del e["metaData"]
             del e["isArray"]
+            if e["metaData"] is not None:
+                for md in e["metaData"]:
+                    self.metaData.append(md)
             for key in list(e.keys()):
                 current_e_props.append(key)
             for key in current_e_props:
@@ -842,6 +843,10 @@ class MsbClient(websocket.WebSocketApp):
                 del f["implementation"]
             if f["dataFormat"] is None:
                 del f["dataFormat"]
+            if f["metaData"] is not None:
+                for md in f["metaData"]:
+                    self.metaData.append(md)
+                del f["metaData"]
             _fu.append(f)
         self_description["functions"] = _fu
         self_description["configuration"] = self.configuration
