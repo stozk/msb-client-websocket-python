@@ -362,11 +362,11 @@ if __name__ == "__main__":
     # myMsbClient.connect('wss://localhost:8084')
 
     # connect to server by defining server url in line, otherwise the application.properties file will be read
-    # myMsbClient.connect(msb_url)
+    myMsbClient.connect(msb_url)
     # myMsbClient.connect()
 
     # register client on MSB
-    # myMsbClient.register()
+    myMsbClient.register()
 
     # disconnect client from MSB
     # myMsbClient.disconnect()

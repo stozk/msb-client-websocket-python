@@ -15,8 +15,6 @@ from .Event import Event
 from .ComplexDataFormat import ComplexDataFormat
 from .Function import Function
 from .DataFormat import getDataType
-from .CustomMetaData import CustomMetaData
-from .TypeDescription import TypeDescription
 
 @jsonpickle.handlers.register(enum.Enum, base=True)
 class EnumHandler(jsonpickle.handlers.BaseHandler):
@@ -818,7 +816,7 @@ class MsbClient(websocket.WebSocketApp):
                     _md.pop("_class")
                     if _md["typeDescription"] is not None:
                         _md["typeDescription"].pop("selector")
-                        _md["typeDescription"]["@class"] = "typeDescription"
+                        _md["typeDescription"]["@class"] = "TypeDescription"
                         _md["typeDescription"].pop("_class")
                     self_description["metaData"].append(_md)
                 elif _md["_class"] == "TypeDescription":
@@ -831,7 +829,7 @@ class MsbClient(websocket.WebSocketApp):
                     md.pop("_class")
                     if md["typeDescription"] is not None:
                         md["typeDescription"].pop("selector")
-                        md["typeDescription"]["@class"] = "typeDescription"
+                        md["typeDescription"]["@class"] = "TypeDescription"
                         md["typeDescription"].pop("_class")
                     self_description["metaData"].append(md)
                 elif md["_class"] == "TypeDescription":
@@ -873,7 +871,7 @@ class MsbClient(websocket.WebSocketApp):
                         md.pop("_class")
                         if md["typeDescription"] is not None:
                             md["typeDescription"].pop("selector")
-                            md["typeDescription"]["@class"] = "typeDescription"
+                            md["typeDescription"]["@class"] = "TypeDescription"
                             md["typeDescription"].pop("_class")
                         self_description["metaData"].append(md)
                     elif md["_class"] == "TypeDescription":
