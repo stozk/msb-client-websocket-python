@@ -15,6 +15,8 @@ from .Event import Event
 from .ComplexDataFormat import ComplexDataFormat
 from .Function import Function
 from .DataFormat import getDataType
+from .CustomMetaData import CustomMetaData
+from .TypeDescription import TypeDescription
 
 @jsonpickle.handlers.register(enum.Enum, base=True)
 class EnumHandler(jsonpickle.handlers.BaseHandler):
@@ -28,13 +30,13 @@ class MsbClient(websocket.WebSocketApp):
     """
 
     def __init__(
-        self,
-        service_type=None,
-        uuid=None,
-        name=None,
-        description=None,
-        token=None,
-        applicationPropertiesCustomPath=None,
+            self,
+            service_type=None,
+            uuid=None,
+            name=None,
+            description=None,
+            token=None,
+            applicationPropertiesCustomPath=None,
     ):
         """Initializes a new msb client.
 
@@ -246,7 +248,7 @@ class MsbClient(websocket.WebSocketApp):
         if debug:
             logging.basicConfig(
                 format="[%(asctime)s] %(module)s %(name)s.%(funcName)s"
-                + " +%(lineno)s: %(levelname)-8s [%(process)d] %(message)s"
+                       + " +%(lineno)s: %(levelname)-8s [%(process)d] %(message)s"
             )
             logging.getLogger().setLevel(logging.DEBUG)
         else:
@@ -367,12 +369,12 @@ class MsbClient(websocket.WebSocketApp):
             logging.error("WRONG MSB URL FORMAT: " + str(self.msb_url))
         if self.sockJsFraming:
             self.msb_url_with_wspath = (
-                self.msb_url
-                + "/websocket/data/"
-                + server_id
-                + "/"
-                + session_id
-                + "/websocket"
+                    self.msb_url
+                    + "/websocket/data/"
+                    + server_id
+                    + "/"
+                    + session_id
+                    + "/websocket"
             )
         else:
             self.msb_url_with_wspath = self.msb_url + "/websocket/data/websocket"
@@ -468,13 +470,13 @@ class MsbClient(websocket.WebSocketApp):
         _set_interval(_sendReg, 0.1)
 
     def addEvent(
-        self,
-        event,
-        event_name=None,
-        event_description=None,
-        event_dataformat=None,
-        event_priority=0,
-        isArray=None,
+            self,
+            event,
+            event_name=None,
+            event_description=None,
+            event_dataformat=None,
+            event_priority=0,
+            isArray=None,
     ):
         """Adds an event to the self-description.
 
@@ -525,14 +527,14 @@ class MsbClient(websocket.WebSocketApp):
                 raise Exception("Event with this ID already present: " + str(event.eventId))
 
     def addFunction(
-        self,
-        function,
-        function_name=None,
-        function_description=None,
-        function_dataformat=None,
-        fnpointer=None,
-        isArray=False,
-        responseEvents=None,
+            self,
+            function,
+            function_name=None,
+            function_description=None,
+            function_dataformat=None,
+            fnpointer=None,
+            isArray=False,
+            responseEvents=None,
     ):
         """Adds a function to the self-description.
 
@@ -606,13 +608,13 @@ class MsbClient(websocket.WebSocketApp):
         self.metaData.append(metaData)
 
     def publish(
-        self,
-        eventId,
-        dataObject=None,
-        priority=None,
-        cached=False,
-        postDate=None,
-        correlationId=None,
+            self,
+            eventId,
+            dataObject=None,
+            priority=None,
+            cached=False,
+            postDate=None,
+            correlationId=None,
     ):
         """This function sends the event of the provided event ID.
 
@@ -695,18 +697,18 @@ class MsbClient(websocket.WebSocketApp):
         """
         if isinstance(df, ComplexDataFormat):
             if validateValueForComplexDataformat(
-                value,
-                dataFormat,
-                isArray,
+                    value,
+                    dataFormat,
+                    isArray,
             ):
                 return True
             else:
                 return False
         else:
             if validateValueForSimpleDataformat(
-                value,
-                df,
-                isArray,
+                    value,
+                    df,
+                    isArray,
             ):
                 return True
             else:
@@ -792,8 +794,7 @@ class MsbClient(websocket.WebSocketApp):
         self_description["name"] = self.name
         self_description["description"] = self.description
         self_description["token"] = self.token
-        if self.metaData != []:
-            self_description["metaData"] = self.metaData
+        self_description["metaData"] = []
         _ev = []
         e_props = ["@id", "id", "dataFormat", "description", "eventId", "name"]
         for event in self.events:
@@ -809,12 +810,34 @@ class MsbClient(websocket.WebSocketApp):
             del e["df"]
             if e["dataFormat"] is None:
                 del e["dataFormat"]
-            if e["metaData"] == []:
-                del e["metaData"]
             del e["isArray"]
-            if e["metaData"] is not None:
-                for md in e["metaData"]:
-                    self.metaData.append(md)
+            for md in self.metaData:
+                _md = jsonpickle.decode(jsonpickle.encode(md, unpicklable=False))
+                if _md["_class"] == "CustomMetaData":
+                    _md["@class"] = _md["_class"]
+                    _md.pop("_class")
+                    if _md["typeDescription"] is not None:
+                        _md["typeDescription"].pop("selector")
+                        _md["typeDescription"]["@class"] = "typeDescription"
+                        _md["typeDescription"].pop("_class")
+                    self_description["metaData"].append(_md)
+                elif _md["_class"] == "TypeDescription":
+                    _md["@class"] = _md["_class"]
+                    _md.pop("_class")
+                    self_description["metaData"].append(_md)
+            for md in e["metaData"]:
+                if md["_class"] == "CustomMetaData":
+                    md["@class"] = md["_class"]
+                    md.pop("_class")
+                    if md["typeDescription"] is not None:
+                        md["typeDescription"].pop("selector")
+                        md["typeDescription"]["@class"] = "typeDescription"
+                        md["typeDescription"].pop("_class")
+                    self_description["metaData"].append(md)
+                elif md["_class"] == "TypeDescription":
+                    md["@class"] = md["_class"]
+                    md.pop("_class")
+                    self_description["metaData"].append(md)
             for key in list(e.keys()):
                 current_e_props.append(key)
             for key in current_e_props:
@@ -845,7 +868,18 @@ class MsbClient(websocket.WebSocketApp):
                 del f["dataFormat"]
             if f["metaData"] is not None:
                 for md in f["metaData"]:
-                    self.metaData.append(md)
+                    if md["_class"] == "CustomMetaData":
+                        md["@class"] = md["_class"]
+                        md.pop("_class")
+                        if md["typeDescription"] is not None:
+                            md["typeDescription"].pop("selector")
+                            md["typeDescription"]["@class"] = "typeDescription"
+                            md["typeDescription"].pop("_class")
+                        self_description["metaData"].append(md)
+                    elif md["_class"] == "TypeDescription":
+                        md["@class"] = md["_class"]
+                        md.pop("_class")
+                        self_description["metaData"].append(md)
                 del f["metaData"]
             _fu.append(f)
         self_description["functions"] = _fu

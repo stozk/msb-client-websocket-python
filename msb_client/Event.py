@@ -28,7 +28,6 @@ class Event:
         event_dataFormat,
         priority=0,
         isArray=False,
-        metaData=[],
     ):
         """Initializes a new event.
 
@@ -45,7 +44,7 @@ class Event:
         self.description = event_description
         self.priority = priority
         self.isArray = isArray
-        self.metaData = metaData
+        self.metaData = []
         if (
             isinstance(event_dataFormat, DataFormat)
             or isinstance(event_dataFormat, ComplexDataFormat)

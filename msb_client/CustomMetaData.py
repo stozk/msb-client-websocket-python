@@ -29,3 +29,4 @@ class CustomMetaData(MetaData):
         self.description = description
         self.dataFormat = dataFormat
         self.typeDescription = typeDescription
+        self._class = "CustomMetaData"

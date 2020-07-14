@@ -27,7 +27,6 @@ class Function:
         fnpointer=None,
         isArray=False,
         responseEvents=None,
-        metaData=[]
     ):
         """Initializes a new function.
 
@@ -45,7 +44,8 @@ class Function:
         self.description = function_description
         self.implementation = fnpointer
         self.isArray = isArray
-        self.metaData = metaData
+        self.metaData = []
+
         if responseEvents is None:
             self.responseEvents = []
         else:

@@ -27,3 +27,4 @@ class TypeDescription(MetaData):
         self.id = id
         self.location = location
         self.type = type
+        self._class = "TypeDescription"
