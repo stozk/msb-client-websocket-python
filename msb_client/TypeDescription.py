@@ -15,7 +15,7 @@ class TypeDescription(MetaData):
 
     def __init__(
             self,
-            type,
+            typeDescriptor,
             identifier,
             location,
             selector="/",
@@ -26,5 +26,5 @@ class TypeDescription(MetaData):
         super().__init__(value, selector)
         self.identifier = identifier
         self.location = location
-        self.type = type
+        self.typeDescriptor = typeDescriptor.name
         self._class = "TypeDescription"

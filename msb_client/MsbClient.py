@@ -795,6 +795,26 @@ class MsbClient(websocket.WebSocketApp):
         self_description["metaData"] = []
         _ev = []
         e_props = ["@id", "id", "dataFormat", "description", "eventId", "name"]
+
+        for md in self.metaData:
+            _md = jsonpickle.decode(jsonpickle.encode(md, unpicklable=False))
+            if _md["_class"] == "CustomMetaData":
+                _md["@class"] = _md["_class"]
+                _md.pop("_class")
+                if _md["typeDescription"] is not None:
+                    _md["typeDescription"].pop("selector")
+                    _md["typeDescription"]["@class"] = "TypeDescription"
+                    _md["typeDescription"].pop("_class")
+                    # _md["typeDescription"]["type"] = _md["typeDescription"]["_type"]
+                    # _md["typeDescription"].pop("_type")
+                self_description["metaData"].append(_md)
+            elif _md["_class"] == "TypeDescription":
+                _md["@class"] = _md["_class"]
+                _md.pop("_class")
+                # _md["type"] = _md["_type"]
+                # _md.pop("_type")
+                self_description["metaData"].append(_md)
+
         for event in self.events:
             current_e_props = []
             e = jsonpickle.decode(
@@ -809,20 +829,7 @@ class MsbClient(websocket.WebSocketApp):
             if e["dataFormat"] is None:
                 del e["dataFormat"]
             del e["isArray"]
-            for md in self.metaData:
-                _md = jsonpickle.decode(jsonpickle.encode(md, unpicklable=False))
-                if _md["_class"] == "CustomMetaData":
-                    _md["@class"] = _md["_class"]
-                    _md.pop("_class")
-                    if _md["typeDescription"] is not None:
-                        _md["typeDescription"].pop("selector")
-                        _md["typeDescription"]["@class"] = "TypeDescription"
-                        _md["typeDescription"].pop("_class")
-                    self_description["metaData"].append(_md)
-                elif _md["_class"] == "TypeDescription":
-                    _md["@class"] = _md["_class"]
-                    _md.pop("_class")
-                    self_description["metaData"].append(_md)
+# ////////////////////
             for md in e["metaData"]:
                 if md["_class"] == "CustomMetaData":
                     md["@class"] = md["_class"]
@@ -831,10 +838,14 @@ class MsbClient(websocket.WebSocketApp):
                         md["typeDescription"].pop("selector")
                         md["typeDescription"]["@class"] = "TypeDescription"
                         md["typeDescription"].pop("_class")
+                        # md["typeDescription"]["type"] = md["typeDescription"]["_type"]
+                        # md["typeDescription"].pop("_type")
                     self_description["metaData"].append(md)
                 elif md["_class"] == "TypeDescription":
                     md["@class"] = md["_class"]
                     md.pop("_class")
+                    # md["type"] = md["_type"]
+                    # md.pop("_type")
                     self_description["metaData"].append(md)
             for key in list(e.keys()):
                 current_e_props.append(key)
@@ -873,10 +884,14 @@ class MsbClient(websocket.WebSocketApp):
                             md["typeDescription"].pop("selector")
                             md["typeDescription"]["@class"] = "TypeDescription"
                             md["typeDescription"].pop("_class")
+                            # md["typeDescription"]["type"] = md["typeDescription"]["_type"]
+                            # md["typeDescription"].pop("_type")
                         self_description["metaData"].append(md)
                     elif md["_class"] == "TypeDescription":
                         md["@class"] = md["_class"]
                         md.pop("_class")
+                        # md["type"] = md["_type"]
+                        # md.pop("_type")
                         self_description["metaData"].append(md)
                 del f["metaData"]
             _fu.append(f)
