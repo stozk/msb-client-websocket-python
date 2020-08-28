@@ -20,3 +20,4 @@ class TypeDescriptor(str, Enum):
     UNSPC = 'UNSPC'
     AAS = 'AAS'
     CUSTOM = 'CUSTOM'
+    FINGERPRINT = 'FINGERPRINT'
