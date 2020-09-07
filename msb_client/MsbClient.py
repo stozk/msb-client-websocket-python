@@ -61,6 +61,7 @@ class MsbClient(websocket.WebSocketApp):
         self.dataFormatValidation = True
 
         # connection params
+        self.isGateway = False
         self.connected = False
         self.registered = False
         self.autoReconnect = True
@@ -82,11 +83,13 @@ class MsbClient(websocket.WebSocketApp):
         self.maxMessageSize = 1000000
 
         # smart object definition
+        self.services = []
         self.functions = {}
         self.events = {}
         self.configuration = {}
         self.configuration["parameters"] = {}
         self.metaData = []
+        self.idCount = 0
 
         # // socket
         self.ws = None
@@ -201,8 +204,20 @@ class MsbClient(websocket.WebSocketApp):
                 self.functions[jmsg["functionId"]].implementation(
                     jmsg["functionParameters"]
                 )
+            elif self.isGateway:
+                for service in self.services:
+                    if jmsg["uuid"] == service.uuid:
+                        if jmsg["functionId"] in service.functions:
+                            if "correlationId" in jmsg:
+                                jmsg["functionParameters"]["correlationId"] = jmsg["correlationId"]
+                            else:
+                                logging.debug("correlationid could not be found. Does the websocket interface version support it?")
+                            service.functions[jmsg["functionId"]].implementation(
+                                jmsg["functionParameters"]
+                            )
             else:
                 logging.warning("Function could not be found: " + jmsg["functionId"])
+
         elif message.startswith("K"):
             jmsg = message.replace('\\"', '"')
             jmsg = json.loads(jmsg[2:])
@@ -765,6 +780,15 @@ class MsbClient(websocket.WebSocketApp):
                 "Cannot change config param for unknown key: " + str(key)
             )
 
+    def addService(self, msbClient):
+        """Add Applications or SmartObjects to a Gateway.
+
+        Args:
+            msbClient (:obj:MsbClient): adds an MsbClient Application or SmartObject instance to the Gateway instance.
+        """
+        self.isGateway = True
+        self.services.append(msbClient)
+
     def reRegister(self):
         """Performs a new registration to update the self-description on MSB."""
         logging.debug("Reregistering after configuration parameter change...")
@@ -784,19 +808,21 @@ class MsbClient(websocket.WebSocketApp):
         """
         return jsonpickle.encode(object, unpicklable=False)
 
-    def getSelfDescription(self):
+    def getSelfDescription(self, _client=None):
+        if _client is None:
+            _client = self
         """Generate the self description JSON object of the application or smart object."""
         self_description = {}
-        self_description["@class"] = self.service_type
-        self_description["uuid"] = self.uuid
-        self_description["name"] = self.name
-        self_description["description"] = self.description
-        self_description["token"] = self.token
+        self_description["@class"] = _client.service_type
+        self_description["uuid"] = _client.uuid
+        self_description["name"] = _client.name
+        self_description["description"] = _client.description
+        self_description["token"] = _client.token
         self_description["metaData"] = []
         _ev = []
         e_props = ["@id", "id", "dataFormat", "description", "eventId", "name"]
 
-        for md in self.metaData:
+        for md in _client.metaData:
             _md = jsonpickle.decode(jsonpickle.encode(md, unpicklable=False))
             if _md["_class"] == "CustomMetaData":
                 _md["@class"] = _md["_class"]
@@ -814,15 +840,15 @@ class MsbClient(websocket.WebSocketApp):
                 # _md["type"] = _md["_type"]
                 # _md.pop("_type")
                 self_description["metaData"].append(_md)
-
-        for event in self.events:
+        for event in _client.events:
             current_e_props = []
             e = jsonpickle.decode(
-                jsonpickle.encode(self.events[event], unpicklable=False)
+                jsonpickle.encode(_client.events[event], unpicklable=False)
             )
             for key in list(e.keys()):
                 if key == "id":
                     e["@id"] = e["id"]
+                    e["@id"] = e["@id"] + self.idCount
                     del e[key]
             del e["priority"]
             del e["df"]
@@ -855,18 +881,19 @@ class MsbClient(websocket.WebSocketApp):
                     try:
                         del e[key]
                     except Exception:
-                        logging.exception(self, "Key not found: " + key)
+                        logging.exception(_client, "Key not found: " + key)
             _ev.append(e)
         self_description["events"] = _ev
+        self.idCount = self.idCount + len(_ev)
         _fu = []
-        for function in self.functions:
+        for function in _client.functions:
             f = jsonpickle.decode(
-                jsonpickle.encode(self.functions[function], unpicklable=False)
+                jsonpickle.encode(_client.functions[function], unpicklable=False)
             )
             if f["responseEvents"] and len(f["responseEvents"]) > 0:
                 _re = []
                 for idx, re in enumerate(f["responseEvents"]):
-                    _re.append(self.events[re].id)
+                    _re.append(_client.events[re].id)
                 f["responseEvents"] = _re
             else:
                 del f["responseEvents"]
@@ -896,7 +923,13 @@ class MsbClient(websocket.WebSocketApp):
                 del f["metaData"]
             _fu.append(f)
         self_description["functions"] = _fu
-        self_description["configuration"] = self.configuration
+        self_description["configuration"] = _client.configuration
+        if _client.isGateway:
+            self_description["services"] = []
+            for service in _client.services:
+                self_description["services"].append(_client.getSelfDescription(service))
+        if len(self_description["metaData"]) == 0:
+            del self_description["metaData"]
         return self_description
 
     def readConfig(self):
