@@ -20,7 +20,8 @@ class CustomMetaData(MetaData):
             typeDescription=None,
             selector="/",
             value=None,
-            dataFormat=None
+            dataFormat=None,
+            isArray=False
     ):
         """Initializes a new MetaData object.
         """
@@ -28,5 +29,6 @@ class CustomMetaData(MetaData):
         self.name = name
         self.description = description
         self.dataFormat = dataFormat
+        self.isArray = isArray
         self.typeDescription = typeDescription
         self._class = "CustomMetaData"

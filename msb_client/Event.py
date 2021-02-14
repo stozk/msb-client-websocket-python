@@ -7,11 +7,12 @@ Licensed under the Apache License, Version 2.0
 See the file "LICENSE" for the full license governing this code.
 """
 
-import copy, json, datetime, jsonpickle
+import copy, json, datetime
 
 from .ComplexDataFormat import ComplexDataFormat
 from .DataFormat import DataFormat
 from .DataType import DataType, convertDataType
+from .CustomMetaData import CustomMetaData
 
 
 class Event:
