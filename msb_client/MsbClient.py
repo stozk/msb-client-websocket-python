@@ -16,25 +16,26 @@ from .ComplexDataFormat import ComplexDataFormat
 from .Function import Function
 from .DataFormat import getDataType
 
+
 @jsonpickle.handlers.register(enum.Enum, base=True)
 class EnumHandler(jsonpickle.handlers.BaseHandler):
-
     def flatten(self, obj, data):
         return obj.value  # Convert to json friendly format
 
+
 class MsbClient(websocket.WebSocketApp):
     """Definition of the msb client to handle the creation of the self-description
-     and communication with the msb websocket interface.
+    and communication with the msb websocket interface.
     """
 
     def __init__(
-            self,
-            service_type=None,
-            uuid=None,
-            name=None,
-            description=None,
-            token=None,
-            applicationPropertiesCustomPath=None,
+        self,
+        service_type=None,
+        uuid=None,
+        name=None,
+        description=None,
+        token=None,
+        applicationPropertiesCustomPath=None,
     ):
         """Initializes a new msb client.
 
@@ -89,7 +90,7 @@ class MsbClient(websocket.WebSocketApp):
         self.configuration = {}
         self.configuration["parameters"] = {}
         self.metaData = []
-        self.idCount = 0
+        # self.idCount = 0
 
         # // socket
         self.ws = None
@@ -123,7 +124,7 @@ class MsbClient(websocket.WebSocketApp):
         "NIO_UNAUTHORIZED_CONNECTION",
         "NIO_EVENT_FORWARDING_ERROR",
         "NIO_UNEXPECTED_EVENT_FORWARDING_ERROR",
-        "ping"
+        "ping",
     ]
 
     def sendBuf(self):
@@ -182,11 +183,11 @@ class MsbClient(websocket.WebSocketApp):
                         self.ws.close()
                     except Exception:
                         pass
-            elif message == 'ping':
+            elif message == "ping":
                 if self.sockJsFraming:
                     self.ws.send('["pong"]')
                 else:
-                    self.ws.send('pong')
+                    self.ws.send("pong")
         if message.startswith("C"):
             jmsg = message.replace('\\"', '"')
             jmsg = json.loads(jmsg[2:])
@@ -200,7 +201,9 @@ class MsbClient(websocket.WebSocketApp):
                 if "correlationId" in jmsg:
                     jmsg["functionParameters"]["correlationId"] = jmsg["correlationId"]
                 else:
-                    logging.debug("correlationid could not be found. Does the websocket interface version support it?")
+                    logging.debug(
+                        "correlationid could not be found. Does the websocket interface version support it?"
+                    )
                 self.functions[jmsg["functionId"]].implementation(
                     jmsg["functionParameters"]
                 )
@@ -209,9 +212,13 @@ class MsbClient(websocket.WebSocketApp):
                     if jmsg["uuid"] == service.uuid:
                         if jmsg["functionId"] in service.functions:
                             if "correlationId" in jmsg:
-                                jmsg["functionParameters"]["correlationId"] = jmsg["correlationId"]
+                                jmsg["functionParameters"]["correlationId"] = jmsg[
+                                    "correlationId"
+                                ]
                             else:
-                                logging.debug("correlationid could not be found. Does the websocket interface version support it?")
+                                logging.debug(
+                                    "correlationid could not be found. Does the websocket interface version support it?"
+                                )
                             service.functions[jmsg["functionId"]].implementation(
                                 jmsg["functionParameters"]
                             )
@@ -234,7 +241,13 @@ class MsbClient(websocket.WebSocketApp):
 
     def on_close(self, code, reason):
         logging.debug("DISCONNECTED")
-        logging.debug("Websocket Close Status Code: (" + str(code) + "); Reason: ("+ str(reason) + ")")
+        logging.debug(
+            "Websocket Close Status Code: ("
+            + str(code)
+            + "); Reason: ("
+            + str(reason)
+            + ")"
+        )
         self.connected = False
         self.registered = False
         if self.autoReconnect and not self.userDisconnect:
@@ -261,7 +274,7 @@ class MsbClient(websocket.WebSocketApp):
         if debug:
             logging.basicConfig(
                 format="[%(asctime)s] %(module)s %(name)s.%(funcName)s"
-                       + " +%(lineno)s: %(levelname)-8s [%(process)d] %(message)s"
+                + " +%(lineno)s: %(levelname)-8s [%(process)d] %(message)s"
             )
             logging.getLogger().setLevel(logging.DEBUG)
         else:
@@ -382,12 +395,12 @@ class MsbClient(websocket.WebSocketApp):
             logging.error("WRONG MSB URL FORMAT: " + str(self.msb_url))
         if self.sockJsFraming:
             self.msb_url_with_wspath = (
-                    self.msb_url
-                    + "/websocket/data/"
-                    + server_id
-                    + "/"
-                    + session_id
-                    + "/websocket"
+                self.msb_url
+                + "/websocket/data/"
+                + server_id
+                + "/"
+                + session_id
+                + "/websocket"
             )
         else:
             self.msb_url_with_wspath = self.msb_url + "/websocket/data/websocket"
@@ -424,7 +437,7 @@ class MsbClient(websocket.WebSocketApp):
                                 "cert_reqs": ssl.CERT_NONE,
                                 "check_hostname": False,
                             },
-                            suppress_origin=True
+                            suppress_origin=True,
                         )
                     else:
                         ws.run_forever(
@@ -432,7 +445,7 @@ class MsbClient(websocket.WebSocketApp):
                                 "cert_reqs": ssl.CERT_NONE,
                                 "check_hostname": False,
                             },
-                            suppress_origin=True
+                            suppress_origin=True,
                         )
                 else:
                     if self.keepAlive:
@@ -459,6 +472,7 @@ class MsbClient(websocket.WebSocketApp):
 
     def register(self):
         """Sends registration message to the MSB."""
+
         def _sendReg():
             if self.sockJsFraming:
                 _selfd = json.dumps(
@@ -466,8 +480,12 @@ class MsbClient(websocket.WebSocketApp):
                 ).replace("\\n", "")
                 _selfd = _selfd[1:-1]
                 self.ws.send('["R ' + _selfd + '"]')
+                # print("SOCKJS")
+                # print('["R ' + _selfd[1:-1] + '"]')
             else:
                 self.ws.send("R " + self.objectToJson(self.getSelfDescription()))
+                # print("NOOOOOOSOCKJS")
+                # print("R " + self.objectToJson(self.getSelfDescription()))
 
         def _set_interval(func, sec):
             def func_wrapper():
@@ -483,13 +501,13 @@ class MsbClient(websocket.WebSocketApp):
         _set_interval(_sendReg, 0.1)
 
     def addEvent(
-            self,
-            event,
-            event_name=None,
-            event_description=None,
-            event_dataformat=None,
-            event_priority=0,
-            isArray=None,
+        self,
+        event,
+        event_name=None,
+        event_description=None,
+        event_dataformat=None,
+        event_priority=0,
+        isArray=None,
     ):
         """Adds an event to the self-description.
 
@@ -519,9 +537,9 @@ class MsbClient(websocket.WebSocketApp):
                     event.dataFormat["dataObject"]["type"] = "array"
                     event.dataFormat["dataObject"]["items"] = {}
                     event.dataFormat["dataObject"]["items"]["$ref"] = {}
-                    event.dataFormat["dataObject"]["items"][
-                        "$ref"
-                    ] = event.dataFormat["dataObject"]["$ref"]
+                    event.dataFormat["dataObject"]["items"]["$ref"] = event.dataFormat[
+                        "dataObject"
+                    ]["$ref"]
                     del event.dataFormat["dataObject"]["$ref"]
             # if not an array of complex objects, change dataformat to type object
             elif not event.isArray:
@@ -537,17 +555,19 @@ class MsbClient(websocket.WebSocketApp):
                 logging.error(
                     str(event.eventId) + " already in events, change event id!"
                 )
-                raise Exception("Event with this ID already present: " + str(event.eventId))
+                raise Exception(
+                    "Event with this ID already present: " + str(event.eventId)
+                )
 
     def addFunction(
-            self,
-            function,
-            function_name=None,
-            function_description=None,
-            function_dataformat=None,
-            fnpointer=None,
-            isArray=False,
-            responseEvents=None,
+        self,
+        function,
+        function_name=None,
+        function_description=None,
+        function_dataformat=None,
+        fnpointer=None,
+        isArray=False,
+        responseEvents=None,
     ):
         """Adds a function to the self-description.
 
@@ -575,9 +595,7 @@ class MsbClient(websocket.WebSocketApp):
         if function.responseEvents is not None:
             for responseEvent in function.responseEvents:
                 if responseEvent not in self.events:
-                    logging.error(
-                        "Event not found for id " + responseEvent
-                    )
+                    logging.error("Event not found for id " + responseEvent)
                     raise Exception("Event not found for id " + responseEvent)
         # for complex objects, update dataformat
         if function.dataFormat is not None:
@@ -598,6 +616,7 @@ class MsbClient(websocket.WebSocketApp):
         # logging.debug(str(function.dataFormat))
         # validate data format and add function
         if vadilateFunctionDataFormat(function.dataFormat):
+            function.id = len(self.functions) + 1
             if function.functionId not in self.functions:
                 self.functions[function.functionId] = function
             else:
@@ -605,7 +624,9 @@ class MsbClient(websocket.WebSocketApp):
                     str(function.functionId)
                     + " already in functions, change function id!"
                 )
-                raise Exception("Function with this ID already present: " + str(function.functionId))
+                raise Exception(
+                    "Function with this ID already present: " + str(function.functionId)
+                )
 
     def setEventValue(self, eventId, eventValue):
         """Sets the value for an event
@@ -621,13 +642,13 @@ class MsbClient(websocket.WebSocketApp):
         self.metaData.append(metaData)
 
     def publish(
-            self,
-            eventId,
-            dataObject=None,
-            priority=None,
-            cached=False,
-            postDate=None,
-            correlationId=None,
+        self,
+        eventId,
+        dataObject=None,
+        priority=None,
+        cached=False,
+        postDate=None,
+        correlationId=None,
     ):
         """This function sends the event of the provided event ID.
 
@@ -710,18 +731,18 @@ class MsbClient(websocket.WebSocketApp):
         """
         if isinstance(df, ComplexDataFormat):
             if validateValueForComplexDataformat(
-                    value,
-                    dataFormat,
-                    isArray,
+                value,
+                dataFormat,
+                isArray,
             ):
                 return True
             else:
                 return False
         else:
             if validateValueForSimpleDataformat(
-                    value,
-                    df,
-                    isArray,
+                value,
+                df,
+                isArray,
             ):
                 return True
             else:
@@ -753,9 +774,7 @@ class MsbClient(websocket.WebSocketApp):
         if key in self.configuration["parameters"]:
             return self.configuration["parameters"][key]["value"]
         else:
-            logging.warning(
-                "Cannot get config param for unknown key: " + str(key)
-            )
+            logging.warning("Cannot get config param for unknown key: " + str(key))
             raise Exception("Cannot get config param for unknown key: " + str(key))
 
     def changeConfigParameter(self, key, value):
@@ -772,13 +791,9 @@ class MsbClient(websocket.WebSocketApp):
                 if self.connected and self.registered:
                     self.reRegister()
             else:
-                logging.warning(
-                    "Cannot change config param. Value is already set!"
-                )
+                logging.warning("Cannot change config param. Value is already set!")
         else:
-            logging.warning(
-                "Cannot change config param for unknown key: " + str(key)
-            )
+            logging.warning("Cannot change config param for unknown key: " + str(key))
 
     def addService(self, msbClient):
         """Add Applications or SmartObjects to a Gateway.
@@ -803,8 +818,8 @@ class MsbClient(websocket.WebSocketApp):
     def objectToJson(self, object):
         """Converts a python object into a json ovject.
 
-         Returns:
-            json object: The resulting json object
+        Returns:
+           json object: The resulting json object
         """
         return jsonpickle.encode(object, unpicklable=False)
 
@@ -840,6 +855,7 @@ class MsbClient(websocket.WebSocketApp):
                 # _md["type"] = _md["_type"]
                 # _md.pop("_type")
                 self_description["metaData"].append(_md)
+
         for event in _client.events:
             current_e_props = []
             e = jsonpickle.decode(
@@ -848,14 +864,14 @@ class MsbClient(websocket.WebSocketApp):
             for key in list(e.keys()):
                 if key == "id":
                     e["@id"] = e["id"]
-                    e["@id"] = e["@id"] + self.idCount
+                    # e["@id"] = e["@id"] + self.idCount
                     del e[key]
             del e["priority"]
             del e["df"]
             if e["dataFormat"] is None:
                 del e["dataFormat"]
             del e["isArray"]
-# ////////////////////
+            # ////////////////////
             for md in e["metaData"]:
                 if md["_class"] == "CustomMetaData":
                     md["@class"] = md["_class"]
@@ -884,12 +900,27 @@ class MsbClient(websocket.WebSocketApp):
                         logging.exception(_client, "Key not found: " + key)
             _ev.append(e)
         self_description["events"] = _ev
-        self.idCount = self.idCount + len(_ev)
+        # self.idCount = self.idCount + len(_ev)
         _fu = []
+        # f_props = [
+        #     "@id",
+        #     "id",
+        #     "dataFormat",
+        #     "description",
+        #     "functionId",
+        #     "name",
+        #     "responseEvents",
+        # ]
         for function in _client.functions:
             f = jsonpickle.decode(
                 jsonpickle.encode(_client.functions[function], unpicklable=False)
             )
+            for key in list(f.keys()):
+                if key == "id":
+                    # print("##################################################")
+                    f["@id"] = f["id"]
+                    # f["@id"] = f["@id"] + self.idCount
+                    del f[key]
             if f["responseEvents"] and len(f["responseEvents"]) > 0:
                 _re = []
                 for idx, re in enumerate(f["responseEvents"]):
@@ -1021,10 +1052,7 @@ def validateValueForComplexDataformat(value, dataFormat, isArray):
         )
         return True
     except Exception as e:
-        logging.error(
-            "Error validating event: "
-            + str(e)
-        )
+        logging.error("Error validating event: " + str(e))
         return False
 
 
