@@ -37,7 +37,7 @@ if __name__ == "__main__":
     # otherwise the application.properties file will be read
     # myMsbClient = MsbClient()
 
-    msb_url = 'wss://192.168.0.138:8084'
+    msb_url = "wss://192.168.0.138:8084"
     # msb_url = 'wss://localhost:8084'
     # msb_url = 'ws://localhost:8085'
     # msb_url = 'ws://ws2.msb.edu.virtualfortknox.de'
@@ -99,23 +99,39 @@ if __name__ == "__main__":
     # event1.addMetaData("Temperatur",
     #                    MetaDataDefinition())
 
-    myMsbClient.addMetaData(CustomMetaData("Temperatursensor",
-                                           "Temperatursensor",
-                                           TypeDescription(TypeDescriptor.CDD,
-                                                           "0112/2///61987#ABT514#001",
-                                                            "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514")))
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "Temperatursensor",
+            "Temperatursensor",
+            TypeDescription(
+                TypeDescriptor.CDD,
+                "0112/2///61987#ABT514#001",
+                "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
+            ),
+        )
+    )
 
-    event1.addMetaData(CustomMetaData("Temperatur",
-                                      "Umgebungstemperatur",
-                                      TypeDescription(TypeDescriptor.CDD,
-                                                      "0112/2///61987#ABT514#001",
-                                                      "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514"),
-                                      "/EVENT1"))
+    event1.addMetaData(
+        CustomMetaData(
+            "Temperatur",
+            "Umgebungstemperatur",
+            TypeDescription(
+                TypeDescriptor.CDD,
+                "0112/2///61987#ABT514#001",
+                "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
+            ),
+            "/EVENT1",
+        )
+    )
 
-    event1.addMetaData(TypeDescription("0112/2///61987#ABT514#001",
-                                       "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
-                                       TypeDescriptor.CDD,
-                                       "/EVENT1"))
+    event1.addMetaData(
+        TypeDescription(
+            "0112/2///61987#ABT514#001",
+            "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
+            TypeDescriptor.CDD,
+            "/EVENT1",
+        )
+    )
 
     # print(myMsbClient.objectToJson(event1))
 
@@ -133,8 +149,6 @@ if __name__ == "__main__":
     #     DataType.STRING,
     #     1,
     # )
-
-
 
     # the final data format can be provided as a valid JSON string, the array function parameter will be ignored.
     # manual_event = Event(
@@ -242,16 +256,30 @@ if __name__ == "__main__":
     # parameter 5 (fnPointer:printMsg): pointer to the function implementation
     # parameter 6 (bool:optional): True if payload is an array of parameter 4
     # parameter 7 (list:optional): array of response events e.g. ['RESPONSE_EVENT1']
-    function1 = Function("FUNCTION1", "Function1", "Function1_description", DataType.STRING, printMsg, True, [])
+    function1 = Function(
+        "FUNCTION1",
+        "Function1",
+        "Function1_description",
+        DataType.STRING,
+        printMsg,
+        True,
+        [],
+    )
     # add function objects to MSB client
     myMsbClient.addFunction(function1)
 
-    function1.addMetaData(CustomMetaData("Funktion_Temperatur",
-                                          "Funktion_Umgebungstemperatur",
-                                          TypeDescription(TypeDescriptor.CUSTOM,
-                                                          "0112/2///61987#ABT514#001",
-                                                          "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514"),
-                                         "/FUNCTION1"))
+    function1.addMetaData(
+        CustomMetaData(
+            "Funktion_Temperatur",
+            "Funktion_Umgebungstemperatur",
+            TypeDescription(
+                TypeDescriptor.CUSTOM,
+                "0112/2///61987#ABT514#001",
+                "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
+            ),
+            "/FUNCTION1",
+        )
+    )
 
     # optionally, add function directly in line
     # this example has one response event.
@@ -347,12 +375,12 @@ if __name__ == "__main__":
         # pepare the complex ovbject based on a complex data format
         # use it as event value
         myModuleObj = {}
-        myModuleObj['moduleName'] = 'Module 1'
+        myModuleObj["moduleName"] = "Module 1"
         myDeviceObj = {}
-        myDeviceObj['deviceName'] = 'Device 1'
-        myDeviceObj['deviceWeight'] = 1.3
-        myDeviceObj['submodules'] = [myModuleObj]
-        myMsbClient.publish('EVENT5', myDeviceObj)
+        myDeviceObj["deviceName"] = "Device 1"
+        myDeviceObj["deviceWeight"] = 1.3
+        myDeviceObj["submodules"] = [myModuleObj]
+        myMsbClient.publish("EVENT5", myDeviceObj)
 
     # print the generated self description for debug purposes. This function has to be called after all events,
     # functions and parameters have been added or else the output will be incomplete.

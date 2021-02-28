@@ -50,9 +50,8 @@ class Function:
             self.responseEvents = []
         else:
             self.responseEvents = responseEvents
-        if (
-            isinstance(function_dataformat, DataFormat)
-            or isinstance(function_dataformat, ComplexDataFormat)
+        if isinstance(function_dataformat, DataFormat) or isinstance(
+            function_dataformat, ComplexDataFormat
         ):
             # make a deep copy of the root dataformat
             self.dataFormat = copy.deepcopy(function_dataformat).getDataFormat()
@@ -75,7 +74,11 @@ class Function:
                         json_object = {"dataObject": json_object}
                 self.dataFormat = json_object
             except Exception:
-                self.dataFormat = DataFormat(function_dataformat, isArray).getDataFormat()
+                self.dataFormat = DataFormat(
+                    function_dataformat, isArray
+                ).getDataFormat()
+
+    id = 0
 
     def addMetaData(self, metaData):
         self.metaData.append(metaData)
