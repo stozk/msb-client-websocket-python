@@ -8,10 +8,12 @@ See the file "LICENSE" for the full license governing this code.
 """
 import datetime
 import threading
+from typing import TYPE_CHECKING
 import uuid
 import pymongo
 import json
 import flask
+from pymongo.collection import ReturnDocument
 import requests
 import threading
 from flask import request
@@ -33,9 +35,12 @@ if __name__ == "__main__":
     # myclient = pymongo.MongoClient("mongodb://192.168.1.9:27017/")
 
     somgmt_url = "http://192.168.0.67:8081"
+    # somgmt_url = "http://192.168.1.9:8081"
 
-    mydb = myclient["authentcation_service"]
-    col_cpps = mydb["entity_cpps"]
+    authdb = myclient["authentcation_service"]
+    col_cpps = authdb["entity_cpps"]
+    col_vservices = authdb["verification_services"]
+    col_authjobs = authdb["col_authjobs"]
 
     # authdata = {
     #     "uuid": "67f6dcf1-f558-4642-ab8c-4b5b918c2ec4",
@@ -44,7 +49,7 @@ if __name__ == "__main__":
     #     "value": "VALUE_4b5b918c2ec4",
     # }
 
-    def syncServices2():
+    def syncEntities():
         params = {"lifecycleState": "VERIFIED"}
         resp = requests.get(somgmt_url + "/service", params=params)
         new_service_count = 0
@@ -54,57 +59,138 @@ if __name__ == "__main__":
                 "uuid": serv["uuid"],
                 "name": serv["name"],
                 "class": serv["@class"],
+                "auth_active": False,
                 "properties": [],
                 "trustlevel": "0",
             }
 
             print(str(serv["uuid"]))
             meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
+            insertFlag = True
             for md in meta_resp.json():
-                property = {
-                    "serviceUuid": md["serviceUuid"],
-                    "selector": md["selector"],
-                    "weights": {
-                        "origin": {
-                            "natural": {"value": True, "weight": 0.8},
-                            "artificial": {"value": False, "weight": 0.2},
+                if insertFlag:
+                    property = {
+                        "serviceUuid": md["serviceUuid"],
+                        "selector": md["selector"],
+                        "weights": {
+                            "origin": {
+                                "natural": {"value": True, "weight": 0.8},
+                                "artificial": {"value": False, "weight": 0.2},
+                            },
+                            "dynamicity": {
+                                "static": {"value": True, "weight": 0.8},
+                                "dynamic": {"value": False, "weight": 0.2},
+                            },
+                            "access": {
+                                "open": {"value": True, "weight": 0.1},
+                                "closed": {"value": False, "weight": 0.3},
+                                "protected": {"value": False, "weight": 0.6},
+                            },
+                            "complexity": {
+                                "simple": {"value": True, "weight": 0.4},
+                                "complex": {"value": False, "weight": 0.6},
+                            },
+                            "context": {
+                                "spatial": {"value": True, "weight": 0.2},
+                                "temporal": {"value": False, "weight": 0.2},
+                                "presence": {"value": False, "weight": 0.2},
+                                "interaction": {"value": False, "weight": 0.2},
+                                "event": {"value": False, "weight": 0.2},
+                            },
                         },
-                        "dynamicity": {
-                            "static": {"value": True, "weight": 0.8},
-                            "dynamic": {"value": False, "weight": 0.2},
-                        },
-                        "access": {
-                            "open": {"value": True, "weight": 0.1},
-                            "closed": {"value": False, "weight": 0.3},
-                            "protected": {"value": False, "weight": 0.6},
-                        },
-                        "complexity": {
-                            "simple": {"value": True, "weight": 0.4},
-                            "complex": {"value": False, "weight": 0.6},
-                        },
-                        "context": {
-                            "spatial": {"value": True, "weight": 0.2},
-                            "temporal": {"value": False, "weight": 0.2},
-                            "presence": {"value": False, "weight": 0.2},
-                            "interaction": {"value": False, "weight": 0.2},
-                            "event": {"value": False, "weight": 0.2},
-                        },
-                    },
-                    "template_value": "",
-                    "active": False,
-                    "type": "initial",  # initial, active, continuous
-                    "auth_state": "unverified",  # unverified, verified, verifying
-                }
+                        "template_value": "",
+                        "active": False,
+                        "type": "initial",  # initial, active, continuous
+                        "auth_state": "unverified",  # unverified, verified, verifying
+                    }
 
-                if (
-                    "typeDescription" in md
-                    and md["typeDescription"]["typeDescriptor"] == "FINGERPRINT"
-                ):
-                    entity_cpps["properties"].append(property)
+                    if (
+                        "typeDescription" in md
+                        and md["typeDescription"]["typeDescriptor"] == "FINGERPRINT"
+                    ):
+                        entity_cpps["properties"].append(property)
 
-            if not col_cpps.count_documents({"uuid": serv["uuid"]}, limit=1):
+                    if (
+                        "typeDescription" in md
+                        and md["typeDescription"]["identifier"]
+                        == "verification_service"
+                    ):
+                        insertFlag = False
+
+            if (
+                not col_cpps.count_documents({"uuid": serv["uuid"]}, limit=1)
+                and insertFlag
+            ):
                 x = col_cpps.insert_one(entity_cpps)
                 new_service_count = new_service_count + 1
+            insertFlag = True
+        return new_service_count
+
+    def registerVerificationService(serv):
+
+        verification_service = {
+            "uuid": serv["uuid"],
+            "name": serv["name"],
+            "class": serv["@class"],
+            "properties": [],
+        }
+
+        meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
+        insertFlag = False
+        for md in meta_resp.json():
+            property = {}
+
+            if (
+                "typeDescription" in md
+                and md["typeDescription"]["identifier"] == "verification_service"
+            ):
+                verification_service["properties"].append(property)
+            if (
+                "typeDescription" in md
+                and md["typeDescription"]["identifier"] == "verification_service"
+            ):
+                insertFlag = True
+
+        if (
+            not col_vservices.count_documents({"uuid": serv["uuid"]}, limit=1)
+            and insertFlag
+        ):
+            x = col_vservices.insert_one(verification_service)
+
+        return x.acknowledged
+
+    def syncVerificationServices():
+        params = {"lifecycleState": "VERIFIED"}
+        resp = requests.get(somgmt_url + "/service", params=params)
+        new_service_count = 0
+        for serv in resp.json():
+
+            verification_service = {
+                "uuid": serv["uuid"],
+                "name": serv["name"],
+                "class": serv["@class"],
+                "properties": [],
+            }
+
+            # print(str(serv["uuid"]))
+            meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
+            for md in meta_resp.json():
+                property = {}
+                if (
+                    "typeDescription" in md
+                    and md["typeDescription"]["identifier"] == "verification_service"
+                ):
+                    # print(str(serv["uuid"]))
+                    # print(str(serv["name"]))
+                    verification_service["properties"].append(property)
+                    if not col_vservices.count_documents(
+                        {"uuid": serv["uuid"]}, limit=1
+                    ):
+                        # print(str(serv["uuid"]))
+                        # print(str(serv["name"]))
+                        x = col_vservices.insert_one(verification_service)
+                        new_service_count = new_service_count + 1
+
         return new_service_count
 
     # myquery = {"uuid": authdata["uuid"]}
@@ -119,7 +205,7 @@ if __name__ == "__main__":
     # else:
     #     print("The database does not exist: " + str(dblist))
 
-    # print(mydb.list_collection_names())
+    # print(authdb.list_collection_names())
 
     # myquery = {"uuid": "67f6dcf1-f558-4642-ab8c-4b5b918c2ec4"}
     # mydoc = mycol.find(myquery)
@@ -137,8 +223,14 @@ if __name__ == "__main__":
     def startContinuousPropertyAuthentication(authData):
         print("authenticating property")
 
-    def setTrustLevel(authData):
+    def setTrustLevel(entity):
         print("trying to find auth service for property")
+
+    def checkEntitiesForAuth():
+        results = col_cpps.find({"auth_active": True}, {"_id": False})
+        # print(col_cpps.count_documents({"auth_active": True}))
+        for entity in results:
+            print(entity["uuid"])
 
     app = flask.Flask(__name__)
     app.config["DEBUG"] = True
@@ -148,8 +240,8 @@ if __name__ == "__main__":
         return "<h1>Self-Description Property Authentication Service</h1><p>v.0.1</p>"
 
     @app.route("/sync", methods=["GET"])
-    def syncServices():
-        service_count = syncServices2()
+    def syncServiceCall():
+        service_count = syncEntities()
         # myclient.drop_database("sdp_authentication")
         return "<h1>DB sync</h1><p>" + str(service_count) + " Services synched.</p>"
 
@@ -163,12 +255,9 @@ if __name__ == "__main__":
     def getByUuidQuery():
         # here we want to get the value of user (i.e. ?user=some-value)
         uuid = request.args.get("uuid")
-        # print(uuid)
-        # if results.count() != 0:
         if col_cpps.count_documents({"uuid": str(uuid)}, limit=1):
-            myquery = {"uuid": str(uuid)}
-            results = col_cpps.find(myquery, {"_id": False})
-            return jsonify(results[0])
+            result = col_cpps.find_one({"uuid": str(uuid)}, {"_id": False})
+            return jsonify(result)
         else:
             return jsonify({})
 
@@ -176,20 +265,64 @@ if __name__ == "__main__":
     def getByUuid(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
-            results = col_cpps.find(myquery, {"_id": False})
+            result = col_cpps.find_one(myquery, {"_id": False})
             # if results.count() != 0:
-            return jsonify(results[0])
+            return jsonify(result)
         else:
             return jsonify({})
 
-    @app.route("/<uuid>/<selector>", methods=["GET"])
+    @app.route("/<uuid>/<selector>", methods=["GET", "POST"])
     def getProperty(uuid, selector):
+        if request.method == "GET":
+            if col_cpps.count_documents({"uuid": uuid}, limit=1):
+                myquery = {"uuid": uuid}
+                results = col_cpps.find(myquery, {"_id": False})
+                for md in results[0]["properties"]:
+                    if md["selector"] == "/" + selector:
+                        return jsonify(md)
+            else:
+                return jsonify({})
+
+        elif request.method == "POST":
+            data = json.loads(request.data.decode("utf-8"))
+            if col_cpps.count_documents({"uuid": uuid}, limit=1):
+                myquery = {"uuid": uuid}
+                results = col_cpps.find(myquery, {"_id": False})
+                for md in results[0]["properties"]:
+                    if md["selector"] == "/" + selector:
+                        col_cpps.update_one(
+                            {"uuid": uuid, "properties": md},
+                            {"$set": {"properties.$": data}},
+                        )
+                        print(data)
+                result = col_cpps.find_one({"uuid": uuid}, {"_id": False})
+                return jsonify(result)
+            else:
+                return jsonify({})
+
+    @app.route("/<uuid>/on", methods=["GET"])
+    def enableEntityAuth(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
-            myquery = {"uuid": uuid}
-            results = col_cpps.find(myquery, {"_id": False})
-            for md in results[0]["properties"]:
-                if md["selector"] == "/" + selector:
-                    return jsonify(md)
+            retdoc = col_cpps.find_one_and_update(
+                {"uuid": uuid},
+                {"$set": {"auth_active": True}},
+                projection={"_id": False},
+                return_document=ReturnDocument.AFTER,
+            )
+            return jsonify(retdoc)
+        else:
+            return jsonify({})
+
+    @app.route("/<uuid>/off", methods=["GET"])
+    def disableEntityAuth(uuid):
+        if col_cpps.count_documents({"uuid": uuid}, limit=1):
+            retdoc = col_cpps.find_one_and_update(
+                {"uuid": uuid},
+                {"$set": {"auth_active": False}},
+                projection={"_id": False},
+                return_document=ReturnDocument.AFTER,
+            )
+            return jsonify(retdoc)
         else:
             return jsonify({})
 
@@ -225,10 +358,21 @@ if __name__ == "__main__":
         else:
             return jsonify({})
 
-    @app.route("/all", methods=["GET"])
-    def getAll():
+    @app.route("/entities", methods=["GET"])
+    def getEntities():
         if col_cpps.count_documents({}):
             results = col_cpps.find({}, {"_id": False})
+            resArray = []
+            for res in results:
+                resArray.append(res)
+            return jsonify(resArray)
+        else:
+            return jsonify([])
+
+    @app.route("/vservices", methods=["GET"])
+    def getVServices():
+        if col_vservices.count_documents({}):
+            results = col_vservices.find({}, {"_id": False})
             resArray = []
             for res in results:
                 resArray.append(res)
@@ -256,10 +400,19 @@ if __name__ == "__main__":
         col_cpps.insert_many(insertList)
         return jsonify(insertListPrint)
 
-    @app.route("/register", methods=["POST"])
+    @app.route("/register", methods=["GET", "POST"])
     def register():
-        print(str(request.json))
-        return json.dumps({"success": True}), 200, {"ContentType": "application/json"}
+        if request.method == "GET":
+            service_count = syncVerificationServices()
+            return str(service_count)
+
+        if request.method == "POST":
+            insert_result = registerVerificationService(request.json)
+            return (
+                json.dumps({"success": insert_result}),
+                200,
+                {"ContentType": "application/json"},
+            )
 
     # app.run(host="0.0.0.0", port=1337)
 
@@ -650,5 +803,17 @@ if __name__ == "__main__":
     # wst = threading.Thread(target=runMsbClient)
     # # wst.setDaemon(True)
     # wst.start()
+
+    def set_interval(func, sec):
+        def func_wrapper():
+            set_interval(func, sec)
+            func()
+
+        t = threading.Timer(sec, func_wrapper)
+        t.start()
+        # t.cancel()
+        return t
+
+    # set_interval(checkEntitiesForAuth, 5)
 
     app.run(host="0.0.0.0", port=1337)
