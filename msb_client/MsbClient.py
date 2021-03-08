@@ -842,10 +842,14 @@ class MsbClient(websocket.WebSocketApp):
             if _md["_class"] == "CustomMetaData":
                 _md["@class"] = _md["_class"]
                 _md.pop("_class")
+                if hasattr(md.value, '__call__'):
+                    _md["value"] = md.value()
                 if _md["typeDescription"] is not None:
                     _md["typeDescription"].pop("selector")
                     _md["typeDescription"]["@class"] = "TypeDescription"
                     _md["typeDescription"].pop("_class")
+                    if hasattr(md.typeDescription.value, '__call__'):
+                        _md["typeDescription"]["value"] = md.typeDescription.value()
                     # _md["typeDescription"]["type"] = _md["typeDescription"]["_type"]
                     # _md["typeDescription"].pop("_type")
                 self_description["metaData"].append(_md)
@@ -854,6 +858,8 @@ class MsbClient(websocket.WebSocketApp):
                 _md.pop("_class")
                 # _md["type"] = _md["_type"]
                 # _md.pop("_type")
+                if hasattr(md.value, '__call__'):
+                    _md["value"] = md.value()
                 self_description["metaData"].append(_md)
 
         for event in _client.events:
