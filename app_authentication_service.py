@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import uuid
 import pymongo
 import json
+import copy
 import flask
 from pymongo.collection import ReturnDocument
 import requests
@@ -98,7 +99,7 @@ if __name__ == "__main__":
                                 "event": {"value": False, "weight": 0.2},
                             },
                         },
-                        "template_value": "",
+                        "template": {"value": "", "ed":1},
                         "active": False,
                         "type": "initial",  # initial, active, continuous
                         "auth_state": "unverified",  # unverified, verified, verifying
@@ -162,7 +163,7 @@ if __name__ == "__main__":
     def syncVerificationServices():
         params = {"lifecycleState": "VERIFIED"}
         resp = requests.get(somgmt_url + "/service", params=params)
-        new_service_count = 0
+        change_result = {"new": 0, "update": 0}
         for serv in resp.json():
 
             verification_service = {
@@ -171,6 +172,8 @@ if __name__ == "__main__":
                 "class": serv["@class"],
                 "properties": [],
             }
+
+            v_props = []
 
             # print(str(serv["uuid"]))
             meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
@@ -182,16 +185,24 @@ if __name__ == "__main__":
                 ):
                     # print(str(serv["uuid"]))
                     # print(str(serv["name"]))
-                    verification_service["properties"].append(property)
+                    v_props.append(property)
+                    verification_service["properties"] = v_props
                     if not col_vservices.count_documents(
                         {"uuid": serv["uuid"]}, limit=1
                     ):
-                        # print(str(serv["uuid"]))
-                        # print(str(serv["name"]))
                         x = col_vservices.insert_one(verification_service)
-                        new_service_count = new_service_count + 1
-
-        return new_service_count
+                        change_result["new"] = change_result["new"] + 1
+                    else:
+                        print(
+                            "##################################################################"
+                        )
+                        col_vservices.find_one_and_update(
+                            {"uuid": serv["uuid"]},
+                            {"$set": {"name": serv["name"], "properties": v_props}},
+                        )
+                        change_result["update"] = change_result["update"] + 1
+        print(str(change_result))
+        return change_result
 
     # myquery = {"uuid": authdata["uuid"]}
     # results = mycol.find(myquery)
@@ -227,31 +238,90 @@ if __name__ == "__main__":
         print("trying to find auth service for property")
 
     def checkEntitiesForAuth():
-        results = col_cpps.find({"auth_active": True}, {"_id": False})
+        activeAuthEntities = col_cpps.find({"auth_active": True}, {"_id": False})
+        inactiveAuthEntities = col_cpps.find({"auth_active": False},projection={"uuid": True, "_id": False})
         # print(col_cpps.count_documents({"auth_active": True}))
-        for entity in results:
+        synchedJobs = {"added":[], "removed":[]}
+        activeUUIDs = []
+        inactiveUUIDs = []
+        for entity in activeAuthEntities:
             print(entity["uuid"])
+            authjob = {
+                "uuid": entity["uuid"],
+                "name": entity["name"],
+                "initial": [],
+                "active": [],
+                "continuous": []
+            }
+            activeUUIDs.append(entity["uuid"])
+            if not col_authjobs.count_documents({"uuid": entity["uuid"]}, limit=1):
+                col_authjobs.insert_one(authjob)
+                synchedJobs["added"].append(col_authjobs.find_one({"uuid": entity["uuid"]}, {"_id": False}))
+
+        for entity in inactiveAuthEntities:
+            inactiveUUIDs.append(entity["uuid"])
+
+        currentAuthJobs = col_authjobs.find({},projection={"uuid": True, "_id": False})
+        currentAuthJobUUIDs = []
+        for uuid in currentAuthJobs:
+            currentAuthJobUUIDs.append(uuid["uuid"])
+        UUIDsToRemove = [x for x in inactiveUUIDs if x in currentAuthJobUUIDs]
+
+        for uuid in UUIDsToRemove:
+            synchedJobs["removed"].append(copy.copy(col_authjobs.find_one({"uuid": uuid}, {"_id": False})))
+            col_authjobs.delete_one({"uuid": uuid})
+
+        return synchedJobs
 
     app = flask.Flask(__name__)
     app.config["DEBUG"] = True
 
+    @app.route("/authentication", methods=["GET"])
+    def getJobs():
+        if col_cpps.count_documents({}):
+            results = col_authjobs.find({}, {"_id": False})
+            resArray = []
+            for res in results:
+                resArray.append(res)
+            return jsonify(resArray)
+        else:
+            return jsonify([])
+
+    @app.route("/authentication/<uuid>", methods=["GET"])
+    def getJobByUuid(uuid):
+        if col_cpps.count_documents({"uuid": uuid}, limit=1):
+            myquery = {"uuid": uuid}
+            result = col_authjobs.find_one(myquery, {"_id": False})
+            # if results.count() != 0:
+            return jsonify(result)
+        else:
+            return jsonify({})
+
+    @app.route("/authentication/sync", methods=["GET"])
+    def syncJobs():
+        return jsonify(checkEntitiesForAuth())
+
     @app.route("/", methods=["GET"])
     def home():
-        return "<h1>Self-Description Property Authentication Service</h1><p>v.0.1</p>"
+        homeinfo = {
+            "application": "Self-Description Property Authentication Service",
+            "version": "0.1"
+        }
+        return jsonify(homeinfo)
 
-    @app.route("/sync", methods=["GET"])
+    @app.route("/entities/sync", methods=["GET"])
     def syncServiceCall():
         service_count = syncEntities()
         # myclient.drop_database("sdp_authentication")
-        return "<h1>DB sync</h1><p>" + str(service_count) + " Services synched.</p>"
+        return str(service_count)
 
-    @app.route("/drop", methods=["GET"])
+    @app.route("/entities/drop", methods=["GET"])
     def dropDb():
         myclient.drop_database("authentcation_service")
         # myclient.drop_database("sdp_authentication")
         return "<h1>DB drop</h1><p>authentcation_service dropped.</p>"
 
-    @app.route("/find", methods=["GET"])
+    @app.route("/entities/find", methods=["GET"])
     def getByUuidQuery():
         # here we want to get the value of user (i.e. ?user=some-value)
         uuid = request.args.get("uuid")
@@ -369,7 +439,7 @@ if __name__ == "__main__":
         else:
             return jsonify([])
 
-    @app.route("/vservices", methods=["GET"])
+    @app.route("/entities/verification", methods=["GET"])
     def getVServices():
         if col_vservices.count_documents({}):
             results = col_vservices.find({}, {"_id": False})
@@ -386,7 +456,6 @@ if __name__ == "__main__":
         insertListPrint = []
         for i in range(1, 10):
             UUID = str(uuid.uuid4())
-            print(UUID)
             authdata = {
                 "uuid": str(UUID),
                 "operationId": "OPERATION_" + str(UUID[-12:]),
@@ -400,11 +469,12 @@ if __name__ == "__main__":
         col_cpps.insert_many(insertList)
         return jsonify(insertListPrint)
 
-    @app.route("/register", methods=["GET", "POST"])
+
+    @app.route("/entities/register", methods=["GET", "POST"])
     def register():
         if request.method == "GET":
             service_count = syncVerificationServices()
-            return str(service_count)
+            return jsonify(service_count)
 
         if request.method == "POST":
             insert_result = registerVerificationService(request.json)
@@ -546,16 +616,16 @@ if __name__ == "__main__":
     #     )
     # )
 
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "OS_hostname",
-    #         "OS_hostname",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "OS_hostname", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "OS_hostname",
+            "OS_hostname",
+            TypeDescription(TypeDescriptor.CUSTOM, "OS_hostname", ""),
+            "/",
+            "METHOD_STUB_TO_GET_DATA",
+            DataType.STRING,
+        )
+    )
 
     # myMsbClient.addMetaData(
     #     CustomMetaData(
