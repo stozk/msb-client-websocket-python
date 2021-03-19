@@ -1,0 +1,112 @@
+{
+  "hw": {
+    "architecture": "armv7l",
+    "cpu-cores": 4,
+    "cpu-freq": [
+      [
+        1500.0,
+        600.0,
+        1500.0
+      ],
+      [
+        1500.0,
+        600.0,
+        1500.0
+      ],
+      [
+        1500.0,
+        600.0,
+        1500.0
+      ],
+      [
+        1500.0,
+        600.0,
+        1500.0
+      ]
+    ],
+    "cpu-temp": 51.121,
+    "cpu-use": "1.5",
+    "processor": "ARMv7 Processor rev 3 (v7l)",
+    "ram": {
+      "free": "7811.4",
+      "total": "8157.2",
+      "used": "103.0"
+    },
+    "storage": {
+      "free": "1.5G",
+      "partitions": [
+        [
+          "/dev/root",
+          "/",
+          "ext4",
+          "rw,noatime",
+          255,
+          4096
+        ],
+        [
+          "/dev/mmcblk0p1",
+          "/boot",
+          "vfat",
+          "rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,errors=remount-ro",
+          1530,
+          4096
+        ]
+      ],
+      "percentage": "6%",
+      "remaining": "27G",
+      "total": "29G"
+    }
+  },
+  "network": {
+    "eth0": {
+      "10": [
+        {
+          "addr": "fe80::1388:4bf4:3d0b:fc9a%eth0",
+          "netmask": "ffff:ffff:ffff:ffff::/64"
+        }
+      ],
+      "17": [
+        {
+          "addr": "dc:a6:32:b1:17:2c",
+          "broadcast": "ff:ff:ff:ff:ff:ff"
+        }
+      ],
+      "2": [
+        {
+          "addr": "192.168.1.125",
+          "broadcast": "192.168.1.255",
+          "netmask": "255.255.255.0"
+        }
+      ]
+    },
+    "lo": {
+      "10": [
+        {
+          "addr": "::1",
+          "netmask": "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128"
+        }
+      ],
+      "17": [
+        {
+          "addr": "00:00:00:00:00:00",
+          "peer": "00:00:00:00:00:00"
+        }
+      ],
+      "2": [
+        {
+          "addr": "127.0.0.1",
+          "netmask": "255.0.0.0",
+          "peer": "127.0.0.1"
+        }
+      ]
+    }
+  },
+  "os": {
+    "hostname": "Raspi-4-8GB",
+    "platform": "Linux",
+    "platform-release": "4.19.118-v7l+",
+    "platform-version": "#1311 SMP Mon Apr 27 14:26:42 BST 2020",
+    "serial": "10000000c32d884f",
+    "uptime": 10908579.81
+  }
+}

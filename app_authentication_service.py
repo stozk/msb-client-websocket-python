@@ -37,10 +37,10 @@ if __name__ == "__main__":
     somgmt_url = "http://192.168.0.67:8081"
     # somgmt_url = "http://192.168.1.9:8081"
 
-    authdb = myclient["authentcation_service"]
-    col_cpps = authdb["entity_cpps"]
-    col_vservices = authdb["verification_services"]
-    col_authjobs = authdb["col_authjobs"]
+    auth_db = myclient["authentcation_service"]
+    col_cpps = auth_db["entity_cpps"]
+    col_vservices = auth_db["verification_services"]
+    col_authjobs = auth_db["col_authjobs"]
 
 
     # authdata = {
@@ -166,6 +166,7 @@ if __name__ == "__main__":
         resp = requests.get(somgmt_url + "/service", params=params)
         change_result = {"new": 0, "update": 0}
         for serv in resp.json():
+            isVerificationService = False
 
             verification_service = {
                 "uuid": serv["uuid"],
@@ -174,52 +175,40 @@ if __name__ == "__main__":
                 "properties": [],
             }
 
-            v_props = []
-
-            # print(str(serv["uuid"]))
             meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
             for md in meta_resp.json():
-                property = {}
                 if (
                         "typeDescription" in md
                         and md["typeDescription"]["identifier"] == "verification_service"
                 ):
-                    # print(str(serv["uuid"]))
-                    # print(str(serv["name"]))
-                    v_props.append(property)
-                    verification_service["properties"] = v_props
-                    if not col_vservices.count_documents(
-                            {"uuid": serv["uuid"]}, limit=1
-                    ):
-                        x = col_vservices.insert_one(verification_service)
-                        change_result["new"] = change_result["new"] + 1
-                    else:
-                        col_vservices.find_one_and_update(
-                            {"uuid": serv["uuid"]},
-                            {"$set": {"name": serv["name"], "properties": v_props}},
-                        )
-                        change_result["update"] = change_result["update"] + 1
+                    isVerificationService = True
+                if (
+                        "typeDescription" in md
+                        and md["typeDescription"]["identifier"] == "property_verification"
+                ):
+                    verification_service["properties"].append(md["typeDescription"]["value"])
+
+            if not col_vservices.count_documents({"uuid": serv["uuid"]}, limit=1) and isVerificationService:
+                x = col_vservices.insert_one(verification_service)
+                change_result["new"] = change_result["new"] + 1
+            elif isVerificationService:
+                # print("UPDATING SERVICE " + serv["uuid"])
+                # updated = False
+                # vservice = col_vservices.find_one({"uuid": serv["uuid"]}, {"_id": False})
+                # print("found: " + json.dumps(vservice))
+                # new_props = copy.deepcopy(vservice["properties"])
+                # for prop in vservice["properties"]:
+                #     if prop not in verification_service["properties"]:
+                #         new_props.append(prop)
+                #         updated = True
+                col_vservices.find_one_and_update(
+                    {"uuid": serv["uuid"]},
+                    {"$set": {"name": serv["name"], "properties":  verification_service["properties"]}},
+                )
+                # if updated:
+                change_result["update"] = change_result["update"] + 1
         print(str(change_result))
         return change_result
-
-
-    # myquery = {"uuid": authdata["uuid"]}
-    # results = mycol.find(myquery)
-    # if col_cpps.count_documents({"uuid": authdata["uuid"]}) == 0:
-    #     x = col_cpps.insert_one(authdata)
-    # if results.count() == 0:
-
-    # dblist = myclient.list_database_names()
-    # if "mydatabase" in dblist:
-    #     print("The database exists.")
-    # else:
-    #     print("The database does not exist: " + str(dblist))
-
-    # print(authdb.list_collection_names())
-
-    # myquery = {"uuid": "67f6dcf1-f558-4642-ab8c-4b5b918c2ec4"}
-    # mydoc = mycol.find(myquery)
-    # print(mydoc)
 
     def initializeAuthentication(authData):
         print("initialize authentication")
@@ -286,13 +275,11 @@ if __name__ == "__main__":
             col_authjobs.delete_one({"uuid": uuid})
 
         for entity in col_cpps.find({"auth_active": True}, {"_id": False}):
-            print("CHECKING PROPERTIES")
             updated = False
             authjob = col_authjobs.find_one({"uuid": entity["uuid"]}, {"_id": False})
 
             for prop in entity["properties"]:
                 if not any(job['selector'] == prop["selector"] for job in authjob[prop["type"]]) and prop["active"]:
-                    print("FIRST CASE")
                     verificationjob = {
                         "uuid": entity["uuid"],
                         "selector": prop["selector"],
@@ -321,7 +308,6 @@ if __name__ == "__main__":
                 #     updated = True
 
             if updated:
-                print("UPDATED!")
                 col_authjobs.update_one(
                     {"uuid": entity["uuid"]},
                     {"$set": {"initial": authjob["initial"], "active": authjob["active"], "continuous": authjob["continuous"]}}
@@ -399,7 +385,7 @@ if __name__ == "__main__":
             return jsonify({})
 
 
-    @app.route("/<uuid>", methods=["GET"])
+    @app.route("/entities/<uuid>", methods=["GET"])
     def getByUuid(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
@@ -410,7 +396,7 @@ if __name__ == "__main__":
             return jsonify({})
 
 
-    @app.route("/<uuid>/<selector>", methods=["GET", "POST"])
+    @app.route("/entities/<uuid>/<path:selector>", methods=["GET", "POST"])
     def getProperty(uuid, selector):
         if request.method == "GET":
             if col_cpps.count_documents({"uuid": uuid}, limit=1):
@@ -440,7 +426,7 @@ if __name__ == "__main__":
                 return jsonify({})
 
 
-    @app.route("/<uuid>/on", methods=["GET"])
+    @app.route("/entities/<uuid>/on", methods=["GET"])
     def enableEntityAuth(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             retdoc = col_cpps.find_one_and_update(
@@ -454,7 +440,7 @@ if __name__ == "__main__":
             return jsonify({})
 
 
-    @app.route("/<uuid>/off", methods=["GET"])
+    @app.route("/entities/<uuid>/off", methods=["GET"])
     def disableEntityAuth(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             retdoc = col_cpps.find_one_and_update(
@@ -468,7 +454,7 @@ if __name__ == "__main__":
             return jsonify({})
 
 
-    @app.route("/<uuid>/<selector>/on", methods=["GET"])
+    @app.route("/entities/<uuid>/<path:selector>/on", methods=["GET"])
     def enableAuthProperty(uuid, selector):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
@@ -485,7 +471,7 @@ if __name__ == "__main__":
             return jsonify({})
 
 
-    @app.route("/<uuid>/<selector>/off", methods=["GET"])
+    @app.route("/entities/<uuid>/<path:selector>/off", methods=["GET"])
     def disableAuthProperty(uuid, selector):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
@@ -506,10 +492,10 @@ if __name__ == "__main__":
     def getEntities():
         if col_cpps.count_documents({}):
             results = col_cpps.find({}, {"_id": False})
-            resArray = []
-            for res in results:
-                resArray.append(res)
-            return jsonify(resArray)
+            # resArray = []
+            # for res in results:
+            #     resArray.append(res)
+            return jsonify([res for res in results])
         else:
             return jsonify([])
 
@@ -518,15 +504,15 @@ if __name__ == "__main__":
     def getVServices():
         if col_vservices.count_documents({}):
             results = col_vservices.find({}, {"_id": False})
-            resArray = []
-            for res in results:
-                resArray.append(res)
-            return jsonify(resArray)
+            # resArray = []
+            # for res in results:
+            #     resArray.append(res)
+            return jsonify([res for res in results])
         else:
             return jsonify([])
 
 
-    @app.route("/generate", methods=["GET"])
+    @app.route("/entities/generate", methods=["GET"])
     def generate():
         insertList = []
         insertListPrint = []

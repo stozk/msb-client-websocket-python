@@ -34,8 +34,9 @@ if __name__ == "__main__":
         SO_DESCRIPTION,
         SO_TOKEN,
     )
-
-    msb_url = "wss://192.168.1.9:8084"
+    #
+    # msb_url = "wss://192.168.1.9:8084"
+    msb_url = "wss://192.168.0.67:8084"
 
     myMsbClient.enableDebug(True)
     myMsbClient.enableTrace(False)
@@ -65,6 +66,20 @@ if __name__ == "__main__":
             TypeDescription(
                 TypeDescriptor.CUSTOM, "0112/2///61360_4#AAA103#001-FEIN", ""
             ),
+        )
+    )
+
+    def getCPUSpeed():
+        return "1.5 Ghz"
+
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "CPU_SPEED",
+            "###### Nominal CPU Speed",
+            TypeDescription(TypeDescriptor.CUSTOM, "cpu_speed", "", "/", getCPUSpeed),
+            "/",
+            getCPUSpeed,
+            DataType.STRING,
         )
     )
 
@@ -104,7 +119,7 @@ if __name__ == "__main__":
                 "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/2a050a792eee78e1c12575560054b803/670dc436b7e157cac1257dd300515f41",
             ),
             "/",
-            "METHOD_STUB_TO_GET_DATA",
+            "2GB",
             DataType.DOUBLE,
         )
     )
@@ -287,7 +302,7 @@ if __name__ == "__main__":
     myMsbClient.addEvent(e_cpu_speed_reading)
 
     f_cpu_speed = Function(
-        "CPU_SPEED",
+        "MEASURE_CPU_SPEED",
         "Start CPU speed measurement",
         "Starts CPU speed measurement for fingerprinting",
         DataType.BOOLEAN,
@@ -297,10 +312,10 @@ if __name__ == "__main__":
     )
     f_cpu_speed.addMetaData(
         CustomMetaData(
-            "CPU_SPEED",
+            "MEASURE_CPU_SPEED",
             "Measure CPU speed for fingerprinting",
             TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_SPEED", ""),
-            "/CPU_SPEED",
+            "/MEASURE_CPU_SPEED",
         )
     )
     myMsbClient.addFunction(f_cpu_speed)

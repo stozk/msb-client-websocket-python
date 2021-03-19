@@ -29,11 +29,11 @@ from flask import jsonify
 
 if __name__ == "__main__":
 
-    somgmt_url = "http://192.168.0.67:8081"
-    # somgmt_url = "http://192.168.1.9:8081"
+    # somgmt_url = "http://192.168.0.67:8081"
+    somgmt_url = "http://192.168.1.9:8081"
 
-    myclient = pymongo.MongoClient("mongodb://192.168.0.67:27017/")
-    # myclient = pymongo.MongoClient("mongodb://192.168.1.9:27017/")
+    # myclient = pymongo.MongoClient("mongodb://192.168.0.67:27017/")
+    myclient = pymongo.MongoClient("mongodb://192.168.1.9:27017/")
 
     mydb = myclient["authentcation_proxy"]
     mycol = mydb["auth_services"]

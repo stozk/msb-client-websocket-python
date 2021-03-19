@@ -48,9 +48,17 @@ if __name__ == "__main__":
 
     myMsbClient.addMetaData(
         CustomMetaData(
-            "verification_service",
+            "Verfication Service",
             "A service which verifies the authenticity of a specific property",
             TypeDescription(TypeDescriptor.CUSTOM, "verification_service", ""),
+        )
+    )
+
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "CPU_SPEED Verification",
+            "Verifies CPU_SPEED property",
+            TypeDescription(TypeDescriptor.CUSTOM, "property_verification", "", "", "CPU_SPEED"),
         )
     )
 

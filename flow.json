@@ -1,0 +1,92 @@
+{
+  "@id" : 1,
+  "id" : 2000,
+  "name" : "testflow_name2",
+  "description" : "testflow_description2",
+  "ownerUuid" : "7c328ad1-cea5-410e-8dd8-6c7ca5a2e4f5",
+  "transitions" : [ {
+    "@id" : 1,
+    "id" : 1,
+    "sources" : [ ],
+    "targets" : [ ],
+    "inputs" : [ {
+      "@id" : 1,
+      "id" : 1,
+      "transitionInput" : {
+        "@id" : 1,
+        "id" : 1,
+        "connectionFormat" : "JSON",
+        "inputParameters" : [ 1 ],
+        "eventId" : "CPU_SPEED_READINGS",
+        "service" : {
+          "@id" : 1,
+          "id" : 2,
+          "uuid" : "e580e869-b737-4262-979d-c32b3ad34cee",
+          "name" : "Banana Pi M2 Zero",
+          "events" : [ 1 ],
+          "functionCalls" : [ ]
+        },
+        "type" : "InputEvent"
+      },
+      "processors" : [ {
+        "@id" : 1,
+        "id" : 1,
+        "className" : "processor.mapping.datamappingprocessor",
+        "inputs" : [ 1 ],
+        "output" : {
+          "@id" : 2,
+          "id" : 2,
+          "transitionOutput" : {
+            "@id" : 1,
+            "id" : 1,
+            "connectionFormat" : "JSON",
+            "outputParameters" : [ 2 ],
+            "functionId" : "AUTHENTICATE",
+            "httpMethod" : null,
+            "responseEvents" : [ ],
+            "service" : {
+              "@id" : 2,
+              "id" : 1,
+              "uuid" : "d654571c-4d4d-4b74-80a0-22771494cb39",
+              "name" : "Verification Service 1",
+              "events" : [ ],
+              "functionCalls" : [ 1 ]
+            },
+            "type" : "FunctionCall"
+          },
+          "processor" : 1,
+          "direction" : "Output"
+        },
+        "pattern" : {
+          "mapping" : [ {
+            "source" : [ {
+              "path" : "/dataObject",
+              "type" : "ARRAY",
+              "items" : {
+                "path" : "",
+                "template" : " : {type : number, format : double}"
+              },
+              "uniqueEventId" : {
+                "serviceUuid" : "e580e869-b737-4262-979d-c32b3ad34cee",
+                "eventId" : "CPU_SPEED_READINGS"
+              }
+            } ],
+            "target" : {
+              "path" : "/dataObject",
+              "type" : "STRING",
+              "template" : "${/dataObject}"
+            }
+          } ],
+          "template" : "{\"dataObject\":{\"type\":\"string\"}}"
+        }
+      } ],
+      "direction" : "Input"
+    } ],
+    "outputs" : [ 2 ],
+    "processors" : [ 1 ]
+  } ],
+  "services" : [ 1, 2 ],
+  "deployed" : false,
+  "workflowExecutionControl" : false,
+  "group" : ""
+}
