@@ -35,6 +35,7 @@ if __name__ == "__main__":
     # myclient = pymongo.MongoClient("mongodb://192.168.1.9:27017/")
 
     somgmt_url = "http://192.168.0.67:8081"
+    ifdmgmt_url = "http://192.168.0.67:8082"
     # somgmt_url = "http://192.168.1.9:8081"
 
     auth_db = myclient["authentcation_service"]
@@ -49,6 +50,16 @@ if __name__ == "__main__":
     #     "property": "PROP_4b5b918c2ec4",
     #     "value": "VALUE_4b5b918c2ec4",
     # }
+
+    def createAuthFlow(ownerUuid, providerServiceUuid, eventId, consumerServiceUuid, functionId):
+        params = {"targetUuid": consumerServiceUuid}
+        resp = requests.get(
+            ifdmgmt_url + "/integrationFlow/create/{ownerUuid}/{providerServiceUuid}/{eventId}/{consumerServiceUuid}/{functionId}".format(
+                ownerUuid=ownerUuid, providerServiceUuid=providerServiceUuid, eventId=eventId, functionId=functionId),
+            params=params)
+
+    def deleteAuthFlow(integrationFlowUuid):
+        resp = requests.delete(ifdmgmt_url + "/integrationFlow/{integrationFlowUuid}".format(integrationFlowUuid=integrationFlowUuid))
 
     def syncEntities():
         params = {"lifecycleState": "VERIFIED"}
@@ -203,12 +214,13 @@ if __name__ == "__main__":
                 #         updated = True
                 col_vservices.find_one_and_update(
                     {"uuid": serv["uuid"]},
-                    {"$set": {"name": serv["name"], "properties":  verification_service["properties"]}},
+                    {"$set": {"name": serv["name"], "properties": verification_service["properties"]}},
                 )
                 # if updated:
                 change_result["update"] = change_result["update"] + 1
         print(str(change_result))
         return change_result
+
 
     def initializeAuthentication(authData):
         print("initialize authentication")
@@ -288,7 +300,8 @@ if __name__ == "__main__":
 
                     authjob["initial"] = [job for job in authjob["initial"] if job['selector'] != prop["selector"]]
                     authjob["active"] = [job for job in authjob["active"] if job['selector'] != prop["selector"]]
-                    authjob["continuous"] = [job for job in authjob["continuous"] if job['selector'] != prop["selector"]]
+                    authjob["continuous"] = [job for job in authjob["continuous"] if
+                                             job['selector'] != prop["selector"]]
                     authjob[prop["type"]].append(verificationjob)
                     updated = True
 
@@ -300,7 +313,8 @@ if __name__ == "__main__":
                         authjob["active"] = [job for job in authjob["active"] if job['selector'] != prop["selector"]]
                         updated = True
                     elif any(job['selector'] == prop["selector"] for job in authjob["continuous"]):
-                        authjob["continuous"] = [job for job in authjob["continuous"] if job['selector'] != prop["selector"]]
+                        authjob["continuous"] = [job for job in authjob["continuous"] if
+                                                 job['selector'] != prop["selector"]]
                         updated = True
 
                 # elif any(job['selector'] == prop["selector"] for job in authjob[prop["type"]]) and not prop["active"]:
@@ -310,11 +324,13 @@ if __name__ == "__main__":
             if updated:
                 col_authjobs.update_one(
                     {"uuid": entity["uuid"]},
-                    {"$set": {"initial": authjob["initial"], "active": authjob["active"], "continuous": authjob["continuous"]}}
+                    {"$set": {"initial": authjob["initial"], "active": authjob["active"],
+                              "continuous": authjob["continuous"]}}
                 )
 
             if updated:
-                synchedJobs["updated"].append(copy.copy(col_authjobs.find_one({"uuid": entity["uuid"]}, {"_id": False})))
+                synchedJobs["updated"].append(
+                    copy.copy(col_authjobs.find_one({"uuid": entity["uuid"]}, {"_id": False})))
 
         return synchedJobs
 
