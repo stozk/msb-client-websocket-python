@@ -31,12 +31,13 @@ from msb_client.MsbClient import MsbClient
 
 if __name__ == "__main__":
 
-    myclient = pymongo.MongoClient("mongodb://192.168.0.67:27017/")
-    # myclient = pymongo.MongoClient("mongodb://192.168.1.9:27017/")
+    # hostIp ="192.168.0.67"
+    hostIp ="192.168.1.9"
 
-    somgmt_url = "http://192.168.0.67:8081"
-    ifdmgmt_url = "http://192.168.0.67:8082"
-    # somgmt_url = "http://192.168.1.9:8081"
+    myclient = pymongo.MongoClient("mongodb://{ip}:27017/".format(ip = hostIp))
+
+    somgmt_url = "http://{ip}:8081".format(ip = hostIp)
+    ifdmgmt_url = "http://{ip}:8082".format(ip = hostIp)
 
     auth_db = myclient["authentcation_service"]
     col_cpps = auth_db["entity_cpps"]
