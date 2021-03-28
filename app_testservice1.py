@@ -9,6 +9,7 @@ See the file "LICENSE" for the full license governing this code.
 import datetime
 import threading
 import uuid
+import binascii
 
 from msb_client.ComplexDataFormat import ComplexDataFormat
 from msb_client.DataType import DataType
@@ -35,8 +36,8 @@ if __name__ == "__main__":
         SO_TOKEN,
     )
 
-    # msb_url = "wss://192.168.0.67:8084"
-    msb_url = "wss://192.168.1.9:8084"
+    msb_url = "wss://192.168.0.67:8084"
+    # msb_url = "wss://192.168.1.9:8084"
 
     myMsbClient.enableDebug(True)
     myMsbClient.enableTrace(False)
@@ -59,9 +60,19 @@ if __name__ == "__main__":
 
     myMsbClient.addEvent(response_event1)
 
+
+    e_selfdescription_data = Event("SELFDESCRIPTION_DATA", "Contains selfdescription data about service", "Selfdescription Data", DataType.STRING, 1)
+    myMsbClient.addEvent(e_selfdescription_data)
+
     # define the function which will be passed to the function description
     def printMsg(msg):
         print(str(msg["dataObj"]))
+
+
+    def sendSelfDescription(data):
+        print("##############################################################")
+        binstring = str(bin(int.from_bytes(str(myMsbClient.objectToJson(myMsbClient.getSelfDescription())).encode(), 'big')))
+        myMsbClient.publish("SELFDESCRIPTION_DATA", binstring, 1, False, None, SO_UUID)
 
 
     function1 = Function(
@@ -75,6 +86,20 @@ if __name__ == "__main__":
     )
 
     myMsbClient.addFunction(function1)
+
+
+    f_getSelfDescription = Function(
+        "SEND_SELFDESCRIPTION",
+        "Send Selfdescription",
+        "Send Selfdescription",
+        DataType.STRING,
+        sendSelfDescription,
+        False,
+        ["SELFDESCRIPTION_DATA"],
+    )
+
+    myMsbClient.addFunction(f_getSelfDescription)
+
 
     def set_interval(func, sec):
         def func_wrapper():
@@ -97,4 +122,4 @@ if __name__ == "__main__":
     myMsbClient.connect(msb_url)
     myMsbClient.register()
 
-    set_interval(send_data, 5)
+    # set_interval(send_data, 5)

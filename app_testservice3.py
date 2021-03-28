@@ -35,8 +35,8 @@ if __name__ == "__main__":
         SO_TOKEN,
     )
 
-    # msb_url = "wss://192.168.0.67:8084"
-    msb_url = "wss://192.168.1.9:8084"
+    msb_url = "wss://192.168.0.67:8084"
+    # msb_url = "wss://192.168.1.9:8084"
 
     myMsbClient.enableDebug(True)
     myMsbClient.enableTrace(False)

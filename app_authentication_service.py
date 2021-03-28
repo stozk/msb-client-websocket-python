@@ -14,6 +14,7 @@ import pymongo
 import json
 import copy
 import flask
+from deepdiff import DeepDiff
 from pymongo.collection import ReturnDocument
 import requests
 import threading
@@ -30,9 +31,40 @@ from msb_client.Function import Function
 from msb_client.MsbClient import MsbClient
 
 if __name__ == "__main__":
+    # app.run(host="0.0.0.0", port=1337)
 
-    # hostIp ="192.168.0.67"
-    hostIp ="192.168.1.9"
+    """This is a sample client for the MSB python client library."""
+    # define service properties as constructor parameters
+    SERVICE_TYPE = "Application"
+    SO_UUID = "af71d1ad-a2b9-4fd7-a450-ef8b7c72b107"
+    SO_NAME = "Authentication Service"
+    SO_DESCRIPTION = "CPPS Authentication Service"
+    SO_TOKEN = "ef8b7c72b107"
+    myMsbClient = MsbClient(
+        SERVICE_TYPE,
+        SO_UUID,
+        SO_NAME,
+        SO_DESCRIPTION,
+        SO_TOKEN,
+    )
+
+    # msb_url = "wss://192.168.1.9:8084"
+    msb_url = "wss://192.168.0.67:8084"
+
+    myMsbClient.enableDebug(True)
+    myMsbClient.enableTrace(False)
+    myMsbClient.enableDataFormatValidation(True)
+    myMsbClient.disableAutoReconnect(False)
+    myMsbClient.setReconnectInterval(10000)
+    myMsbClient.disableEventCache(False)
+    myMsbClient.setEventCacheSize(1000)
+    myMsbClient.disableHostnameVerification(True)
+    myMsbClient.enableThreadAsDaemon(False)
+
+    owner_uuid = "7c328ad1-cea5-410e-8dd8-6c7ca5a2e4f5"
+
+    hostIp ="192.168.0.67"
+    #hostIp ="192.168.1.9"
 
     myclient = pymongo.MongoClient("mongodb://{ip}:27017/".format(ip = hostIp))
 
@@ -41,9 +73,10 @@ if __name__ == "__main__":
 
     auth_db = myclient["authentcation_service"]
     col_cpps = auth_db["entity_cpps"]
+    col_cpps_sd = auth_db["entity_cpps_sd"]
     col_vservices = auth_db["verification_services"]
-    col_authjobs = auth_db["col_authjobs"]
-
+    col_authjobs = auth_db["authjobs"]
+    col_flows = auth_db["flows"]
 
     # authdata = {
     #     "uuid": "67f6dcf1-f558-4642-ab8c-4b5b918c2ec4",
@@ -52,15 +85,73 @@ if __name__ == "__main__":
     #     "value": "VALUE_4b5b918c2ec4",
     # }
 
-    def createAuthFlow(ownerUuid, providerServiceUuid, eventId, consumerServiceUuid, functionId):
-        params = {"targetUuid": consumerServiceUuid}
+    auth_message = {
+        "serviceUuid": "",
+        "authData": ""
+    }
+
+    complex_prop = {
+        "serviceUuid": "",
+        "props": []
+    }
+
+
+
+    def createFlow(ownerUuid, providerServiceUuid, eventId, consumerServiceUuid, functionId, targetUuid, responseEventId, responseEventConsumerServiceUuid, responseEventConsumerServiceFunctionId, flowName, deploy):
+        params = {"targetUuid": targetUuid,
+                  "responseEventId": responseEventId,
+                  "responseEventConsumerServiceUuid": responseEventConsumerServiceUuid,
+                  "responseEventConsumerServiceFunctionId": responseEventConsumerServiceFunctionId,
+                  "deploy": deploy,
+                  "flowName": flowName}
         resp = requests.get(
             ifdmgmt_url + "/integrationFlow/create/{ownerUuid}/{providerServiceUuid}/{eventId}/{consumerServiceUuid}/{functionId}".format(
-                ownerUuid=ownerUuid, providerServiceUuid=providerServiceUuid, eventId=eventId, functionId=functionId),
+                ownerUuid=ownerUuid, providerServiceUuid=providerServiceUuid, eventId=eventId, consumerServiceUuid=consumerServiceUuid, functionId=functionId),
             params=params)
+        if resp.status_code == 201:
+            return resp.json()
+        else:
+            return resp.status_code
 
-    def deleteAuthFlow(integrationFlowUuid):
+
+    def createAuthFlow():
+        createFlow()
+
+    def createTrainFlow():
+        createFlow()
+
+    def createIdFlow(serviceUuid):
+        return createFlow(owner_uuid, SO_UUID, "SELFDESCRIPTION_REQUEST", serviceUuid, "SEND_SELFDESCRIPTION", serviceUuid, "SELFDESCRIPTION_DATA", SO_UUID, "ID_SELFDESCRIPTION", "Identify " + serviceUuid + " by self-description", True)
+
+    def createInitAuthFlow():
+        createFlow()
+
+    def isJson(jsonObj):
+        try:
+            jsonObject = json.loads(str(jsonObj))
+            print("VALID JSON: " + jsonObj)
+        except ValueError as e:
+            print("NOT JSON: " + json.dumps(jsonObj))
+            return False
+        return True
+
+
+    def identifyEntity(msg):
+        n = int(msg["dataObject"], 2)
+        selfd = n.to_bytes((n.bit_length() + 7) // 8, 'big').decode()
+        allentities = col_cpps_sd.find()
+        for entity in allentities:
+            ddiff = DeepDiff(selfd, entity, ignore_order=True)
+            if ddiff == {}:
+                print(entity["name"])
+                print(entity["uuid"])
+            else:
+                print(entity["uuid"])
+
+
+    def deleteFlow(integrationFlowUuid):
         resp = requests.delete(ifdmgmt_url + "/integrationFlow/{integrationFlowUuid}".format(integrationFlowUuid=integrationFlowUuid))
+        print(resp)
 
     def syncEntities():
         params = {"lifecycleState": "VERIFIED"}
@@ -76,6 +167,14 @@ if __name__ == "__main__":
                 "properties": [],
                 "trustlevel": "0",
             }
+
+            if not col_flows.count_documents({"uuid": serv["uuid"]}, limit=1):
+                entity_flows = {"serviceUuid": serv["uuid"],
+                                "flows": []}
+                col_flows.find_one_and_update({"serviceUuid": serv["uuid"]}, {"$set": entity_flows}, upsert=True)
+
+            serv_resp = requests.get(somgmt_url + "/service/{0}".format(serv["uuid"]))
+            xsd = col_cpps_sd.replace_one({"uuid": serv["uuid"]}, serv_resp.json(), upsert=True)
 
             print(str(serv["uuid"]))
             meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
@@ -111,7 +210,7 @@ if __name__ == "__main__":
                                 "event": {"value": False, "weight": 0.2},
                             },
                         },
-                        "template": {"value": "", "ed": 1},
+                        "template": {"value": "", "ed": 1}, #euklidische Distanz
                         "active": False,
                         "type": "initial"  # initial, active, continuous
                     }
@@ -337,7 +436,7 @@ if __name__ == "__main__":
 
 
     app = flask.Flask(__name__)
-    app.config["DEBUG"] = True
+    app.config["DEBUG"] = False
 
 
     @app.route("/authentication", methods=["GET"])
@@ -390,6 +489,13 @@ if __name__ == "__main__":
         # myclient.drop_database("sdp_authentication")
         return "<h1>DB drop</h1><p>authentcation_service dropped.</p>"
 
+    # @app.route("/entities/identify", methods=["GET"])
+    # def startIdentification():
+    #     # here we want to get the value of user (i.e. ?user=some-value)
+    #     uuid = request.args.get("uuid")
+    #     #sendevent
+    #     #triggers identifyEntity()
+
 
     @app.route("/entities/find", methods=["GET"])
     def getByUuidQuery():
@@ -401,6 +507,26 @@ if __name__ == "__main__":
         else:
             return jsonify({})
 
+    @app.route("/entities/selfdescription", methods=["GET"])
+    def getSelfdescriptions():
+        if col_cpps_sd.count_documents({}):
+            results = col_cpps_sd.find({}, {"_id": False})
+            # resArray = []
+            # for res in results:
+            #     resArray.append(res)
+            return jsonify([res for res in results])
+        else:
+            return jsonify([])
+
+    @app.route("/entities/selfdescription/<uuid>", methods=["GET"])
+    def getSelfdescriptionByUuid(uuid):
+        if col_cpps_sd.count_documents({"uuid": uuid}, limit=1):
+            myquery = {"uuid": uuid}
+            result = col_cpps_sd.find_one(myquery, {"_id": False})
+            # if results.count() != 0:
+            return jsonify(result)
+        else:
+            return jsonify({})
 
     @app.route("/entities/<uuid>", methods=["GET"])
     def getByUuid(uuid):
@@ -563,36 +689,85 @@ if __name__ == "__main__":
                 {"ContentType": "application/json"},
             )
 
+    @app.route("/entities/identify/<uuid>", methods=["GET"])
+    def identifyEntityRestCall(uuid):
+        if col_cpps.count_documents({"uuid": uuid}, limit=1):
+            requestSelfdescription(uuid)
+            return jsonify({"identification_started": True})
+        else:
+            return jsonify({"identification_started": False})
 
-    # app.run(host="0.0.0.0", port=1337)
+    # entity_flows = {"serviceUuid": "",
+    #                 "flows": []}
+    # entity_flow = {"selector": "",
+    #                "flowName": "",
+    #                "flowUuid": ""}
 
-    """This is a sample client for the MSB python client library."""
-    # define service properties as constructor parameters
-    SERVICE_TYPE = "Application"
-    SO_UUID = "af71d1ad-a2b9-4fd7-a450-ef8b7c72b107"
-    SO_NAME = "Authentication Service"
-    SO_DESCRIPTION = "CPPS Authentication Service"
-    SO_TOKEN = "ef8b7c72b107"
-    myMsbClient = MsbClient(
-        SERVICE_TYPE,
-        SO_UUID,
-        SO_NAME,
-        SO_DESCRIPTION,
-        SO_TOKEN,
-    )
+    @app.route("/flows", methods=["GET"])
+    def getFlows():
+        if col_flows.count_documents({}):
+            results = col_flows.find({}, {"_id": False})
+            return jsonify([res for res in results])
+        else:
+            return jsonify([])
 
-    # msb_url = "wss://192.168.1.9:8084"
-    msb_url = "wss://192.168.0.67:8084"
+    @app.route("/flows/<uuid>", methods=["GET"])
+    def getFlowByUuid(uuid):
+        if col_flows.count_documents({"flowUuid": uuid}):
+            results = col_flows.find({"flowUuid": uuid}, {"_id": False})
+            return jsonify([res for res in results])
+        else:
+            return jsonify([0])
 
-    myMsbClient.enableDebug(True)
-    myMsbClient.enableTrace(False)
-    myMsbClient.enableDataFormatValidation(True)
-    myMsbClient.disableAutoReconnect(False)
-    myMsbClient.setReconnectInterval(10000)
-    myMsbClient.disableEventCache(False)
-    myMsbClient.setEventCacheSize(1000)
-    myMsbClient.disableHostnameVerification(True)
-    myMsbClient.enableThreadAsDaemon(False)
+    @app.route("/flows/service/<uuid>", methods=["GET"])
+    def getFlowsByService(uuid):
+        if col_flows.count_documents({}):
+            results = col_flows.find({"serviceUuid": uuid}, {"_id": False})
+            return jsonify([res for res in results])
+        else:
+            return jsonify([])
+
+    @app.route("/flows/service/<uuid>/createIdFlow", methods=["GET"])
+    def createIdFlowRestCall(uuid):
+        if col_flows.count_documents({"serviceUuid": uuid}):
+            resp = createIdFlow(uuid)
+            # print(resp)
+
+            if not isinstance(resp, int):
+
+                entity_flow = {"selector": "SEND_SELFDESCRIPTION",
+                               "flowName": resp["name"],
+                               "flowUuid": resp["uuid"]}
+
+                # col_cpps.find_one_and_update(
+                #     {"uuid": uuid, "properties": md},
+                #     {"$set": {"properties.$.active": False}},
+                # )
+                print(uuid)
+                # if col_flows.count_documents({"serviceUuid": uuid, "flows.selector": "SEND_SELFDESCRIPTION"}):
+
+                service_flows_object = col_flows.find_one({"serviceUuid": uuid})
+
+                flowlist = copy.deepcopy(service_flows_object["flows"])
+
+                for i in range(len(flowlist)):
+                    if flowlist[i]["selector"] == "SEND_SELFDESCRIPTION":
+                        deleteFlow(flowlist[i]["flowUuid"])
+                        del flowlist[i]
+                flowlist.append(entity_flow)
+
+                service_flows = col_flows.update_one({"serviceUuid": uuid}, {"$set": {"flows": flowlist}}, upsert=True)
+                # service_flows = col_flows.find_one_and_update({"serviceUuid": uuid}, {"$set": {"flows": entity_flow}}, projection={"_id": False}, upsert=True, return_document=ReturnDocument.AFTER)
+                # service_flows = col_flows.find_one({"serviceUuid": uuid}, projection={"_id": False})
+                results = col_flows.find_one({"serviceUuid": uuid}, {"_id": False})
+                return jsonify(results)
+                # else:
+                #     service_flows = col_flows.insert_one(entity_flow, projection={"_id": False})
+                #     return service_flows
+            else:
+                # print(resp)
+                return {}
+
 
     myMsbClient.addMetaData(
         CustomMetaData(
@@ -602,352 +777,27 @@ if __name__ == "__main__":
         )
     )
 
+    def requestSelfdescription(serviceUuid):
+        myMsbClient.publish("SELFDESCRIPTION_REQUEST", "", 1, False, None, serviceUuid)
 
-    def f_func1():
-        print("FUNCTION1")
-
-
-    e_event1 = Event(
-        "EVENT1",
-        "EVENT1",
-        "EVENT1",
+    e_selfdescriptionRequest = Event(
+        "SELFDESCRIPTION_REQUEST",
+        "Request for selfdescription",
+        "Request for selfdescription",
         DataType.STRING,
         1,
         False,
     )
+    myMsbClient.addEvent(e_selfdescriptionRequest)
 
-    f_function1 = Function(
-        "FUNCTION1", "FUNCTION1", "FUNCTION1", DataType.STRING, f_func1, False
-    )
-
-    myMsbClient.addEvent(e_event1)
-
-    myMsbClient.addFunction(f_function1)
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "SEN",
-    #         "Sensor - device which, when excited by a physical phenomenon, produces an electric signal characterizing the physical phenomenon",
-    #         TypeDescription(
-    #             TypeDescriptor.CDD,
-    #             "0112/2///61360_4#AAA103#001",
-    #             "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/2a050a792eee78e1c12575560054b803/219d27329351ec25c1257dd300515f69",
-    #         ),
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "Fine Particle Sensor",
-    #         "Sensor which measures fine particles",
-    #         TypeDescription(
-    #             TypeDescriptor.CUSTOM, "0112/2///61360_4#AAA103#001-FEIN", ""
-    #         ),
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "MUP",
-    #         "CPU - processor whose elements have been miniaturized into an integrated circuit",
-    #         TypeDescription(
-    #             TypeDescriptor.CDD,
-    #             "0112/2///61360_4#AAA062#001",
-    #             "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/2a050a792eee78e1c12575560054b803/670dc436b7e157cac1257dd300515f41",
-    #         ),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "CPU_Architecture",
-    #         "CPU_Architecture",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "0112/2///61360_4#AAA062#001", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "RAM",
-    #         "memory that permits access to any of its address locations in any desired sequence",
-    #         TypeDescription(
-    #             TypeDescriptor.CDD,
-    #             "0112/2///61360_4#AAA062#001",
-    #             "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/2a050a792eee78e1c12575560054b803/670dc436b7e157cac1257dd300515f41",
-    #         ),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.DOUBLE,
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "OS_platform",
-    #         "Operating system platform",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "OS_platform", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
-
-    myMsbClient.addMetaData(
-        CustomMetaData(
-            "OS_hostname",
-            "OS_hostname",
-            TypeDescription(TypeDescriptor.CUSTOM, "OS_hostname", ""),
-            "/",
-            "METHOD_STUB_TO_GET_DATA",
-            DataType.STRING,
-        )
-    )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "OS_platform_release",
-    #         "OS_platform_release",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "OS_platform_release", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "OS_platform_version",
-    #         "OS_platform_version",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "OS_platform_version", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "OS_system_serial",
-    #         "OS_system_serial",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "OS_system_serial", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.STRING,
-    #     )
-    # )
-
-    # myMsbClient.addMetaData(
-    #     CustomMetaData(
-    #         "CPU_CORES",
-    #         "CPU core count",
-    #         TypeDescription(TypeDescriptor.CUSTOM, "CPU_CORES", ""),
-    #         "/",
-    #         "METHOD_STUB_TO_GET_DATA",
-    #         DataType.INT32,
-    #     )
-    # )
-
-    # e_particle_concentration = Event(
-    #     "PARTICLE_CONCENTRATION",
-    #     "Aktuelle Partikelkonzentration",
-    #     "Aktuelle Konzentration der Feinstaubpartikel in PPM",
-    #     DataType.INT32,
-    #     1,
-    #     False,
-    # )
-    # e_particle_concentration.addMetaData(
-    #     CustomMetaData(
-    #         "Particle Concentration",
-    #         "Particle Concentration",
-    #         TypeDescription(
-    #             TypeDescriptor.CDD,
-    #             "0112/2///61987#ABT514#001",
-    #             "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
-    #         ),
-    #         "/PARTICLE_CONCENTRATION",
-    #     )
-    # )
-    # e_particle_concentration.addMetaData(
-    #     TypeDescription(
-    #         TypeDescriptor.CDD,
-    #         "0112/2///61987#ABT514#001",
-    #         "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
-    #         "/PARTICLE_CONCENTRATION",
-    #     )
-    # )
-    # myMsbClient.addEvent(e_particle_concentration)
-
-    # e_temperature = Event(
-    #     "AMBIENT_TEMPERATURE",
-    #     "Current ambient temperature",
-    #     "Current temperature reading in °C",
-    #     DataType.DOUBLE,
-    #     1,
-    #     False,
-    # )
-    # e_temperature.addMetaData(
-    #     CustomMetaData(
-    #         "Temperature",
-    #         "Ambient temperature",
-    #         TypeDescription(
-    #             TypeDescriptor.CDD,
-    #             "0112/2///61987#ABT514#001",
-    #             "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
-    #         ),
-    #         "/AMBIENT_TEMPERATURE",
-    #         DataType.DOUBLE,
-    #     )
-    # )
-
-    # e_temperature.addMetaData(
-    #     TypeDescription(
-    #         TypeDescriptor.CDD,
-    #         "0112/2///62720#UAA033#001",
-    #         "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/Units/0112-2---62720%23UAA033",
-    #         "/AMBIENT_TEMPERATURE",
-    #     )
-    # )
-    # myMsbClient.addEvent(e_temperature)
-
-    # def sendParticleData():
-    #     print("Method stub for data sending")
-
-    # def startReadFineParticle():
-    #     print("Method stub for particle reading")
-
-    # f_start_fp_detection = Function(
-    #     "START_FP_DETECTION",
-    #     "Start fine particle measurement",
-    #     "Starts the Process of fine particle measurements",
-    #     DataType.BOOLEAN,
-    #     startReadFineParticle,
-    #     False,
-    #     ["PARTICLE_CONCENTRATION"],
-    # )
-    # f_start_fp_detection.addMetaData(
-    #     CustomMetaData(
-    #         "Funktion_Temperatur",
-    #         "Funktion_Umgebungstemperatur",
-    #         TypeDescription(
-    #             TypeDescriptor.CDD,
-    #             "0112/2///61987#ABT514#001",
-    #             "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
-    #         ),
-    #         "/START_FP_DETECTION",
-    #     )
-    # )
-    # myMsbClient.addFunction(f_start_fp_detection)
-
-    # e_cpu_speed_reading = Event(
-    #     "CPU_SPEED_READINGS",
-    #     "CPU speed readings",
-    #     "CPU speed readings for fingerprinting",
-    #     DataType.DOUBLE,
-    #     1,
-    #     True,
-    # )
-    # e_cpu_speed_reading.addMetaData(
-    #     CustomMetaData(
-    #         "CPU speed readings",
-    #         "CPU speed readings",
-    #         TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_SPEED_READINGS", ""),
-    #         "/CPU_SPEED_READINGS",
-    #         DataType.DOUBLE,
-    #     )
-    # )
-
-    # myMsbClient.addEvent(e_cpu_speed_reading)
-
-    # f_cpu_speed = Function(
-    #     "CPU_SPEED",
-    #     "Start CPU speed measurement",
-    #     "Starts CPU speed measurement for fingerprinting",
-    #     DataType.BOOLEAN,
-    #     startReadFineParticle,
-    #     False,
-    #     ["CPU_SPEED_READINGS"],
-    # )
-    # f_cpu_speed.addMetaData(
-    #     CustomMetaData(
-    #         "CPU_SPEED",
-    #         "Measure CPU speed for fingerprinting",
-    #         TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_SPEED", ""),
-    #         "/CPU_SPEED",
-    #     )
-    # )
-    # myMsbClient.addFunction(f_cpu_speed)
-
-    # e_cpu_temp_reading = Event(
-    #     "CPU_TEMPERATURE_READINGS",
-    #     "CPU temperature readings",
-    #     "CPU temperature readings for fingerprinting",
-    #     DataType.DOUBLE,
-    #     1,
-    #     False,
-    # )
-    # e_cpu_temp_reading.addMetaData(
-    #     CustomMetaData(
-    #         "CPU temperature",
-    #         "CPU temperature readings for fingerprinting",
-    #         TypeDescription(
-    #             TypeDescriptor.FINGERPRINT, "FP_CPU_TEMPERATURE_READINGS", ""
-    #         ),
-    #         "/CPU_TEMPERATURE_READINGS",
-    #         DataType.DOUBLE,
-    #     )
-    # )
-
-    # myMsbClient.addEvent(e_cpu_temp_reading)
-
-    # f_cpu_temp = Function(
-    #     "CPU_TEMPERATURE",
-    #     "Get CPU temperature measurement",
-    #     "Get the CPU tempreature for fingerprinting",
-    #     DataType.DOUBLE,
-    #     startReadFineParticle,
-    #     False,
-    #     ["CPU_TEMPERATURE_READINGS"],
-    # )
-    # f_cpu_temp.addMetaData(
-    #     CustomMetaData(
-    #         "CPU_TEMPERATURE",
-    #         "Measure CPU temperature for fingerprinting",
-    #         TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_TEMPERATURE", ""),
-    #         "/CPU_TEMPERATURE",
-    #     )
-    # )
-    # myMsbClient.addFunction(f_cpu_temp)
-
-    # f_storage_speeds = Function(
-    #     "STORAGE_W_SPEED",
-    #     "Measure storage speed",
-    #     "Measure the CPU Speed for fingerprinting",
-    #     DataType.DOUBLE,
-    #     startReadFineParticle,
-    #     False,
-    #     [],
-    # )
-    # f_storage_speeds.addMetaData(
-    #     CustomMetaData(
-    #         "STORAGE_W_SPEED",
-    #         "Measure the CPU Speed for fingerprinting",
-    #         TypeDescription(TypeDescriptor.FINGERPRINT, "FP_STORAGE_W_SPEED", ""),
-    #         "/STORAGE_W_SPEED",
-    #     )
-    # )
-    # myMsbClient.addFunction(f_storage_speeds)
+    f_idSelfdescription = Function("ID_SELFDESCRIPTION", "Identify Entity by its selfdescription", "Identify Entity", DataType.STRING, identifyEntity, False)
+    myMsbClient.addFunction(f_idSelfdescription)
 
     print(myMsbClient.objectToJson(myMsbClient.getSelfDescription()))
 
 
-    # myMsbClient.connect(msb_url)
-    # myMsbClient.register()
+    myMsbClient.connect(msb_url)
+    myMsbClient.register()
 
     # def runMsbClient():
     #     myMsbClient.connect(msb_url)
