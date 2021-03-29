@@ -839,6 +839,7 @@ class MsbClient(websocket.WebSocketApp):
 
         for md in _client.metaData:
             _md = jsonpickle.decode(jsonpickle.encode(md, unpicklable=False))
+            _md.pop("df", None)
             if _md["_class"] == "CustomMetaData":
                 _md["@class"] = _md["_class"]
                 _md.pop("_class")
@@ -879,6 +880,7 @@ class MsbClient(websocket.WebSocketApp):
             del e["isArray"]
             # ////////////////////
             for md in e["metaData"]:
+                md.pop("df", None)
                 if md["_class"] == "CustomMetaData":
                     md["@class"] = md["_class"]
                     md.pop("_class")
@@ -941,6 +943,7 @@ class MsbClient(websocket.WebSocketApp):
                 del f["dataFormat"]
             if f["metaData"] is not None:
                 for md in f["metaData"]:
+                    md.pop("df", None)
                     if md["_class"] == "CustomMetaData":
                         md["@class"] = md["_class"]
                         md.pop("_class")
