@@ -14,6 +14,7 @@ from msb_client.ComplexDataFormat import ComplexDataFormat
 from msb_client.DataType import DataType
 from msb_client.Event import Event
 from msb_client.CustomMetaData import CustomMetaData
+from msb_client.MetaData import MetaData
 from msb_client.TypeDescription import TypeDescription
 from msb_client.TypeDescriptor import TypeDescriptor
 from msb_client.Function import Function
@@ -83,6 +84,15 @@ if __name__ == "__main__":
 
     myMsbClient.addMetaData(
         CustomMetaData(
+            "CPU Information",
+            "CPU Information",
+            TypeDescription(TypeDescriptor.CUSTOM, "CPU Information", "", "", ""),
+            "/description",
+        )
+    )
+
+    myMsbClient.addMetaData(
+        CustomMetaData(
             "CPU_SPEED_VALUE",
             "###### Nominal CPU Speed",
             TypeDescription(TypeDescriptor.CUSTOM, "cpu_speed", "", "", getCPUSpeed),
@@ -91,6 +101,8 @@ if __name__ == "__main__":
             DataType.STRING,
         )
     )
+
+
 
     myMsbClient.addMetaData(
         CustomMetaData(
@@ -263,14 +275,14 @@ if __name__ == "__main__":
         )
     )
 
-    e_temperature.addMetaData(
-        TypeDescription(
-            TypeDescriptor.CDD,
-            "0112/2///62720#UAA033#001",
-            "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/Units/0112-2---62720%23UAA033",
-            "/AMBIENT_TEMPERATURE",
-        )
-    )
+    # e_temperature.addMetaData(
+    #     TypeDescription(
+    #         TypeDescriptor.CDD,
+    #         "0112/2///62720#UAA033#001",
+    #         "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/Units/0112-2---62720%23UAA033",
+    #         "/AMBIENT_TEMPERATURE",
+    #     )
+    # )
     myMsbClient.addEvent(e_temperature)
 
     def sendParticleData():
@@ -280,7 +292,7 @@ if __name__ == "__main__":
         print("Method stub for particle reading")
 
     f_start_fp_detection = Function(
-        "START_FP_DETECTION",
+        "FINGERPRINT_DET",
         "Start fine particle measurement",
         "Starts the Process of fine particle measurements",
         DataType.BOOLEAN,
@@ -297,13 +309,13 @@ if __name__ == "__main__":
                 "0112/2///61987#ABT514#001",
                 "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
             ),
-            "/START_FP_DETECTION",
+            "",
         )
     )
     myMsbClient.addFunction(f_start_fp_detection)
 
     e_cpu_speed_reading = Event(
-        "CPU_SPEED_READINGS",
+        "RESULT_CPU_SPEED_READINGS",
         "CPU speed readings",
         "CPU speed readings for fingerprinting",
         DataType.DOUBLE,
@@ -315,7 +327,7 @@ if __name__ == "__main__":
             "CPU speed readings",
             "CPU speed readings",
             TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_SPEED_READINGS", ""),
-            "/CPU_SPEED_READINGS",
+            "",
             "",
             DataType.DOUBLE,
         )
@@ -330,7 +342,7 @@ if __name__ == "__main__":
         DataType.BOOLEAN,
         startReadFineParticle,
         False,
-        ["CPU_SPEED_READINGS"],
+        ["RESULT_CPU_SPEED_READINGS"],
     )
 
     f_cpu_speed.addMetaData(
@@ -338,7 +350,8 @@ if __name__ == "__main__":
             "MEASURE_CPU_SPEED",
             "Measure CPU speed for fingerprinting",
             TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_SPEED", ""),
-            "/MEASURE_CPU_SPEED",
+            "",
+            DataType.STRING
         )
     )
     myMsbClient.addFunction(f_cpu_speed)
@@ -351,6 +364,7 @@ if __name__ == "__main__":
         1,
         False,
     )
+
     e_cpu_temp_reading.addMetaData(
         CustomMetaData(
             "CPU temperature",
@@ -390,7 +404,7 @@ if __name__ == "__main__":
     myMsbClient.addEvent(e_cpu_temp_reading)
 
     f_cpu_temp = Function(
-        "CPU_TEMPERATURE",
+        "GET_CPU_TEMPERATURE",
         "Get CPU temperature measurement",
         "Get the CPU tempreature for fingerprinting",
         DataType.DOUBLE,
@@ -403,7 +417,9 @@ if __name__ == "__main__":
             "READ_CPU_TEMPERATURE",
             "Measure CPU temperature for fingerprinting",
             TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_TEMPERATURE", ""),
-            "/CPU_TEMPERATURE",
+            "",
+            "",
+            DataType.DOUBLE
         )
     )
 
@@ -412,24 +428,25 @@ if __name__ == "__main__":
             "Unit",
             "degree Celsius",
             TypeDescription(TypeDescriptor.CDD, "0112/2///62720#UAA033#001", "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/Units/0112-2---62720%23UAA033"),
-            "/CPU_TEMPERATURE",
-            "°C"
+            "",
+            "°C",
+            DataType.STRING
         )
     )
 
-    f_cpu_temp.addMetaData(
-        CustomMetaData(
-            "WuselWuselName",
-            "WuselWuselDescription",
-            TypeDescription(TypeDescriptor.CUSTOM, "WuselWuselIdentifier", "WuselWuselLocation", "WuselSelector", "WuselValue"),
-            "/CPU_TEMPERATURE",
-            "WuselValue",
-            DataType.STRING,
-            False
-        )
-    )
+    # f_cpu_temp.addMetaData(
+    #     CustomMetaData(
+    #         "WuselWuselName",
+    #         "WuselWuselDescription",
+    #         TypeDescription(TypeDescriptor.CUSTOM, "WuselWuselIdentifier", "WuselWuselLocation", "WuselSelector", "WuselValue"),
+    #         "/CPU_TEMPERATURE/wusel",
+    #         "WuselValue",
+    #         DataType.STRING,
+    #         False
+    #     )
+    # )
 
-    f_cpu_temp.addMetaData(TypeDescription(TypeDescriptor.CUSTOM, "WuselWuselIdentifier", "WuselWuselLocation", "/CPU_TEMPERATURE", "WuselValue"))
+    # f_cpu_temp.addMetaData(TypeDescription(TypeDescriptor.CUSTOM, "WuselWuselIdentifier", "WuselWuselLocation", "/CPU_TEMPERATURE", "WuselValue"))
 
     myMsbClient.addFunction(f_cpu_temp)
 

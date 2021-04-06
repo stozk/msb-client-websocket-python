@@ -85,4 +85,8 @@ class Event:
     dataObject = 0
 
     def addMetaData(self, metaData):
+        if metaData.selector == "" or metaData.selector == "/":
+            metaData.selector = "/" + self.eventId
+        if not metaData.selector.startswith("/events"):
+            metaData.selector = "/events" + metaData.selector
         self.metaData.append(metaData)

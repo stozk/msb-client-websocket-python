@@ -81,4 +81,8 @@ class Function:
     id = 0
 
     def addMetaData(self, metaData):
+        if metaData.selector == "" or metaData.selector == "/":
+            metaData.selector = "/" + self.functionId
+        if not metaData.selector.startswith("/functions"):
+            metaData.selector = "/functions" + metaData.selector
         self.metaData.append(metaData)
