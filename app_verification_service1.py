@@ -51,6 +51,9 @@ if __name__ == "__main__":
             "Verfication Service",
             "A service which verifies the authenticity of a specific property",
             TypeDescription(TypeDescriptor.CUSTOM, "verification_service", ""),
+            "/",
+            "verification_service",
+            None
         )
     )
 
@@ -58,8 +61,20 @@ if __name__ == "__main__":
         CustomMetaData(
             "CPU_SPEED Verification",
             "Verifies CPU_SPEED property",
-            TypeDescription(TypeDescriptor.CUSTOM, "property_verification", "", "", "CPU_SPEED"),
-        )
+            TypeDescription(TypeDescriptor.CUSTOM, "property_verification", ""),
+        "/verification",
+        "CPU_SPEED",
+        None)
+    )
+
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "STORAGE_SPEED Verification",
+            "Verifies STORAGE_SPEED property",
+            TypeDescription(TypeDescriptor.CUSTOM, "property_verification", ""),
+        "/verification",
+        "STORAGE_SPEED",
+        None)
     )
 
     def f_func1():
@@ -89,10 +104,13 @@ if __name__ == "__main__":
 
     f_authenticate.addMetaData(
         CustomMetaData(
-            "CPU_SPEED",
-            "Verify CPU_SPEED measurement array",
-            TypeDescription(TypeDescriptor.CUSTOM, "CPU_SPEED", ""),
-        )
+        "CPU_SPEED",
+        "Verify CPU_SPEED measurement array",
+        TypeDescription(TypeDescriptor.CUSTOM, "CPU_SPEED", ""),
+        "/F_AUTHENTICATE",
+        "CPU_SPEED",
+        DataType.FLOAT,
+        True)
     )
 
     myMsbClient.addEvent(e_auth)

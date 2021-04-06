@@ -9,17 +9,19 @@ See the file "LICENSE" for the full license governing this code.
 import datetime
 import threading
 from typing import TYPE_CHECKING
-import uuid
 import pymongo
 import json
 import copy
 import flask
+import uuid as uuidlib
 from deepdiff import DeepDiff
 from pymongo.collection import ReturnDocument
 import requests
 import threading
 from flask import request
 from flask import jsonify
+from difflib import SequenceMatcher
+
 
 from msb_client.ComplexDataFormat import ComplexDataFormat
 from msb_client.DataType import DataType
@@ -48,8 +50,7 @@ if __name__ == "__main__":
         SO_TOKEN,
     )
 
-    # msb_url = "wss://192.168.1.9:8084"
-    msb_url = "wss://192.168.0.67:8084"
+
 
     myMsbClient.enableDebug(True)
     myMsbClient.enableTrace(False)
@@ -64,12 +65,13 @@ if __name__ == "__main__":
     owner_uuid = "7c328ad1-cea5-410e-8dd8-6c7ca5a2e4f5"
 
     hostIp ="192.168.0.67"
-    #hostIp ="192.168.1.9"
+    # hostIp ="192.168.1.9"
 
     myclient = pymongo.MongoClient("mongodb://{ip}:27017/".format(ip = hostIp))
 
     somgmt_url = "http://{ip}:8081".format(ip = hostIp)
     ifdmgmt_url = "http://{ip}:8082".format(ip = hostIp)
+    msb_url = "wss://{ip}:8084".format(ip = hostIp)
 
     auth_db = myclient["authentcation_service"]
     col_cpps = auth_db["entity_cpps"]
@@ -90,13 +92,6 @@ if __name__ == "__main__":
         "authData": ""
     }
 
-    complex_prop = {
-        "serviceUuid": "",
-        "props": []
-    }
-
-
-
     def createFlow(ownerUuid, providerServiceUuid, eventId, consumerServiceUuid, functionId, targetUuid, responseEventId, responseEventConsumerServiceUuid, responseEventConsumerServiceFunctionId, flowName, deploy):
         params = {"targetUuid": targetUuid,
                   "responseEventId": responseEventId,
@@ -114,16 +109,16 @@ if __name__ == "__main__":
             return resp.status_code
 
 
-    def createAuthFlow():
+    def createAuthenticationFlow():
         createFlow()
 
-    def createTrainFlow():
+    def createTrainingFlow():
         createFlow()
 
-    def createIdFlow(serviceUuid):
+    def createIdentificationFlow(serviceUuid):
         return createFlow(owner_uuid, SO_UUID, "SELFDESCRIPTION_REQUEST", serviceUuid, "SEND_SELFDESCRIPTION", serviceUuid, "SELFDESCRIPTION_DATA", SO_UUID, "ID_SELFDESCRIPTION", "Identify " + serviceUuid + " by self-description", True)
 
-    def createInitAuthFlow():
+    def createInitialAuthenticationFlow():
         createFlow()
 
     def isJson(jsonObj):
@@ -135,106 +130,125 @@ if __name__ == "__main__":
             return False
         return True
 
+    def similar(a, b):
+        return SequenceMatcher(None, a, b).ratio()
+
 
     def identifyEntity(msg):
         n = int(msg["dataObject"], 2)
         selfd = n.to_bytes((n.bit_length() + 7) // 8, 'big').decode()
-        allentities = col_cpps_sd.find()
+        allentities = col_cpps_sd.find({}, {"_id": False})
+        results = []
         for entity in allentities:
-            ddiff = DeepDiff(selfd, entity, ignore_order=True)
+            # json_entity = json.loads(entity)
+            json_selfd = json.loads(selfd)
+            ddiff = DeepDiff(json_selfd, entity, ignore_order=True)
             if ddiff == {}:
                 print(entity["name"])
                 print(entity["uuid"])
             else:
-                print(entity["uuid"])
+                results.append(ddiff)
+            # print(entity["name"] + ": " + str(similar(str(entity), str(json.dumps(entity)))))
+        print(min(results, key=len))
 
 
     def deleteFlow(integrationFlowUuid):
         resp = requests.delete(ifdmgmt_url + "/integrationFlow/{integrationFlowUuid}".format(integrationFlowUuid=integrationFlowUuid))
         print(resp)
 
+    def syncEntity(service):
+        if isinstance(service, str):
+            serv_resp = requests.get(somgmt_url + "/service/{0}".format(service))
+            service = copy.deepcopy(serv_resp.json())
+
+        print("service type: " + str(type(service)))
+        print("UUID type: " + str(type(SO_UUID)))
+        entity_cpps = {
+            "uuid": service["uuid"],
+            "name": service["name"],
+            "class": service["@class"],
+            "auth_active": False,
+            "properties": [],
+            "cproperties": [],
+            "trustlevel": "0",
+        }
+
+        if not col_flows.count_documents({"uuid": service["uuid"]}, limit=1):
+            entity_flows = {"serviceUuid": service["uuid"],
+                            "flows": []}
+            col_flows.find_one_and_update({"serviceUuid": service["uuid"]}, {"$set": entity_flows}, upsert=True)
+
+        serv_resp = requests.get(somgmt_url + "/service/{0}".format(service["uuid"]))
+
+        sd_obj = copy.deepcopy(serv_resp.json())
+
+        # if "configurationUrl" in sd_obj["configuration"]:
+        #     del sd_obj["configuration"]["configurationUrl"]
+        # if
+
+        xsd = col_cpps_sd.replace_one({"uuid": service["uuid"]}, serv_resp.json(), upsert=True)
+
+        print(str(service["uuid"]))
+        meta_resp = requests.get(somgmt_url + "/meta/{0}".format(service["uuid"]))
+        insertFlag = True
+        for md in meta_resp.json():
+            if insertFlag:
+                property = {
+                    "serviceUuid": md["serviceUuid"],
+                    "uuid": str(uuidlib.uuid4()),
+                    "selector": md["selector"],
+                    "weights": {
+                        "origin": {
+                            "natural": {"value": True, "weight": 0.8},
+                            "artificial": {"value": False, "weight": 0.2},
+                        },
+                        "dynamicity": {
+                            "static": {"value": True, "weight": 0.8},
+                            "dynamic": {"value": False, "weight": 0.2},
+                        },
+                        "access": {
+                            "open": {"value": True, "weight": 0.1},
+                            "closed": {"value": False, "weight": 0.3},
+                            "protected": {"value": False, "weight": 0.6},
+                        },
+                        "complexity": {
+                            "simple": {"value": True, "weight": 0.4},
+                            "complex": {"value": False, "weight": 0.6},
+                        },
+                        "context": {
+                            "spatial": {"value": True, "weight": 0.2},
+                            "temporal": {"value": False, "weight": 0.2},
+                            "presence": {"value": False, "weight": 0.2},
+                            "interaction": {"value": False, "weight": 0.2},
+                            "event": {"value": False, "weight": 0.2},
+                        },
+                    },
+                    "template": {"value": "", "ed": 1}, #euklidische Distanz
+                    "active": False,
+                    "type": "initial"  # initial, active, continuous
+                }
+                # print(property["uuid"])
+                if ("typeDescription" in md and md["typeDescription"]["typeDescriptor"] == "FINGERPRINT"):
+                    entity_cpps["properties"].append(property)
+
+                if ("typeDescription" in md and md["typeDescription"]["identifier"] == "verification_service"):
+                    insertFlag = False
+
+        if (not col_cpps.count_documents({"uuid": service["uuid"]}, limit=1) and insertFlag):
+            x = col_cpps.insert_one(entity_cpps)
+            # new_service_count = new_service_count + 1
+            return True
+        # insertFlag = True
+        return False
+
+
     def syncEntities():
         params = {"lifecycleState": "VERIFIED"}
-        resp = requests.get(somgmt_url + "/service", params=params)
+        services = requests.get(somgmt_url + "/service", params=params)
         new_service_count = 0
-        for serv in resp.json():
-
-            entity_cpps = {
-                "uuid": serv["uuid"],
-                "name": serv["name"],
-                "class": serv["@class"],
-                "auth_active": False,
-                "properties": [],
-                "trustlevel": "0",
-            }
-
-            if not col_flows.count_documents({"uuid": serv["uuid"]}, limit=1):
-                entity_flows = {"serviceUuid": serv["uuid"],
-                                "flows": []}
-                col_flows.find_one_and_update({"serviceUuid": serv["uuid"]}, {"$set": entity_flows}, upsert=True)
-
-            serv_resp = requests.get(somgmt_url + "/service/{0}".format(serv["uuid"]))
-            xsd = col_cpps_sd.replace_one({"uuid": serv["uuid"]}, serv_resp.json(), upsert=True)
-
-            print(str(serv["uuid"]))
-            meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
-            insertFlag = True
-            for md in meta_resp.json():
-                if insertFlag:
-                    property = {
-                        "serviceUuid": md["serviceUuid"],
-                        "selector": md["selector"],
-                        "weights": {
-                            "origin": {
-                                "natural": {"value": True, "weight": 0.8},
-                                "artificial": {"value": False, "weight": 0.2},
-                            },
-                            "dynamicity": {
-                                "static": {"value": True, "weight": 0.8},
-                                "dynamic": {"value": False, "weight": 0.2},
-                            },
-                            "access": {
-                                "open": {"value": True, "weight": 0.1},
-                                "closed": {"value": False, "weight": 0.3},
-                                "protected": {"value": False, "weight": 0.6},
-                            },
-                            "complexity": {
-                                "simple": {"value": True, "weight": 0.4},
-                                "complex": {"value": False, "weight": 0.6},
-                            },
-                            "context": {
-                                "spatial": {"value": True, "weight": 0.2},
-                                "temporal": {"value": False, "weight": 0.2},
-                                "presence": {"value": False, "weight": 0.2},
-                                "interaction": {"value": False, "weight": 0.2},
-                                "event": {"value": False, "weight": 0.2},
-                            },
-                        },
-                        "template": {"value": "", "ed": 1}, #euklidische Distanz
-                        "active": False,
-                        "type": "initial"  # initial, active, continuous
-                    }
-
-                    if (
-                            "typeDescription" in md
-                            and md["typeDescription"]["typeDescriptor"] == "FINGERPRINT"
-                    ):
-                        entity_cpps["properties"].append(property)
-
-                    if (
-                            "typeDescription" in md
-                            and md["typeDescription"]["identifier"]
-                            == "verification_service"
-                    ):
-                        insertFlag = False
-
-            if (
-                    not col_cpps.count_documents({"uuid": serv["uuid"]}, limit=1)
-                    and insertFlag
-            ):
-                x = col_cpps.insert_one(entity_cpps)
-                new_service_count = new_service_count + 1
-            insertFlag = True
+        for service in services.json():
+            if(syncEntity(service)):
+                new_service_count += 1
         return new_service_count
 
 
@@ -250,29 +264,23 @@ if __name__ == "__main__":
         meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
         insertFlag = False
         for md in meta_resp.json():
-            property = {}
+            # property = {}
 
-            if (
-                    "typeDescription" in md
-                    and md["typeDescription"]["identifier"] == "verification_service"
-            ):
-                verification_service["properties"].append(property)
-            if (
-                    "typeDescription" in md
-                    and md["typeDescription"]["identifier"] == "verification_service"
-            ):
+            # if "typeDescription" in md and md["typeDescription"]["identifier"] == "verification_service":
+            #     verification_service["properties"].append(property)
+            if "typeDescription" in md and md["typeDescription"]["identifier"] == "verification_service":
                 insertFlag = True
 
-        if (
-                not col_vservices.count_documents({"uuid": serv["uuid"]}, limit=1)
-                and insertFlag
-        ):
+            if "typeDescription" in md and md["typeDescription"]["identifier"] == "property_verification" and md["value"] not in verification_service["properties"]:
+                verification_service["properties"].append(md["value"])
+
+        if not col_vservices.count_documents({"uuid": serv["uuid"]}, limit=1) and insertFlag:
             x = col_vservices.insert_one(verification_service)
 
         return x.acknowledged
 
 
-    def syncVerificationServices():
+    def synchronizeVerificationServices():
         params = {"lifecycleState": "VERIFIED"}
         resp = requests.get(somgmt_url + "/service", params=params)
         change_result = {"new": 0, "update": 0}
@@ -288,16 +296,10 @@ if __name__ == "__main__":
 
             meta_resp = requests.get(somgmt_url + "/meta/{0}".format(serv["uuid"]))
             for md in meta_resp.json():
-                if (
-                        "typeDescription" in md
-                        and md["typeDescription"]["identifier"] == "verification_service"
-                ):
+                if "typeDescription" in md and md["typeDescription"]["identifier"] == "verification_service":
                     isVerificationService = True
-                if (
-                        "typeDescription" in md
-                        and md["typeDescription"]["identifier"] == "property_verification"
-                ):
-                    verification_service["properties"].append(md["typeDescription"]["value"])
+                if "typeDescription" in md and md["typeDescription"]["identifier"] == "property_verification":
+                    verification_service["properties"].append(md["value"])
 
             if not col_vservices.count_documents({"uuid": serv["uuid"]}, limit=1) and isVerificationService:
                 x = col_vservices.insert_one(verification_service)
@@ -312,10 +314,7 @@ if __name__ == "__main__":
                 #     if prop not in verification_service["properties"]:
                 #         new_props.append(prop)
                 #         updated = True
-                col_vservices.find_one_and_update(
-                    {"uuid": serv["uuid"]},
-                    {"$set": {"name": serv["name"], "properties": verification_service["properties"]}},
-                )
+                col_vservices.find_one_and_update({"uuid": serv["uuid"]}, {"$set": {"name": serv["name"], "properties": verification_service["properties"]}})
                 # if updated:
                 change_result["update"] = change_result["update"] + 1
         print(str(change_result))
@@ -341,17 +340,19 @@ if __name__ == "__main__":
     def setTrustLevel(entity):
         print("trying to find auth service for property")
 
-
-    def checkEntitiesForAuth():
+    def checkEntitiesForAuthentication():
         activeAuthEntities = col_cpps.find({"auth_active": True}, {"_id": False})
+
         inactiveAuthEntities = col_cpps.find({"auth_active": False}, projection={"uuid": True, "_id": False})
         # print(col_cpps.count_documents({"auth_active": True}))
         synchedJobs = {"added": [], "updated": [], "removed": []}
         activeUUIDs = []
         inactiveUUIDs = []
+
         for entity in activeAuthEntities:
             print(entity["uuid"])
             authjob = {
+                # "uuid": str(uuidlib.uuid4()),
                 "uuid": entity["uuid"],
                 "name": entity["name"],
                 "initial": [],
@@ -390,32 +391,33 @@ if __name__ == "__main__":
             updated = False
             authjob = col_authjobs.find_one({"uuid": entity["uuid"]}, {"_id": False})
 
-            for prop in entity["properties"]:
-                if not any(job['selector'] == prop["selector"] for job in authjob[prop["type"]]) and prop["active"]:
-                    verificationjob = {
-                        "uuid": entity["uuid"],
-                        "selector": prop["selector"],
-                        "verification_state": "unverified",  # unverified, verified, verifying
-                    }
+            if authjob != None:
+                for prop in entity["properties"]:
+                    if not any(job['selector'] == prop["selector"] for job in authjob[prop["type"]]) and prop["active"]:
+                        verificationjob = {
+                            "uuid": entity["uuid"],
+                            "selector": prop["selector"],
+                            "verification_state": "unverified",  # unverified, verified, verifying
+                        }
 
-                    authjob["initial"] = [job for job in authjob["initial"] if job['selector'] != prop["selector"]]
-                    authjob["active"] = [job for job in authjob["active"] if job['selector'] != prop["selector"]]
-                    authjob["continuous"] = [job for job in authjob["continuous"] if
-                                             job['selector'] != prop["selector"]]
-                    authjob[prop["type"]].append(verificationjob)
-                    updated = True
-
-                elif not prop["active"]:
-                    if any(job['selector'] == prop["selector"] for job in authjob["initial"]):
                         authjob["initial"] = [job for job in authjob["initial"] if job['selector'] != prop["selector"]]
-                        updated = True
-                    elif any(job['selector'] == prop["selector"] for job in authjob["active"]):
                         authjob["active"] = [job for job in authjob["active"] if job['selector'] != prop["selector"]]
-                        updated = True
-                    elif any(job['selector'] == prop["selector"] for job in authjob["continuous"]):
                         authjob["continuous"] = [job for job in authjob["continuous"] if
                                                  job['selector'] != prop["selector"]]
+                        authjob[prop["type"]].append(verificationjob)
                         updated = True
+
+                    elif not prop["active"]:
+                        if any(job['selector'] == prop["selector"] for job in authjob["initial"]):
+                            authjob["initial"] = [job for job in authjob["initial"] if job['selector'] != prop["selector"]]
+                            updated = True
+                        elif any(job['selector'] == prop["selector"] for job in authjob["active"]):
+                            authjob["active"] = [job for job in authjob["active"] if job['selector'] != prop["selector"]]
+                            updated = True
+                        elif any(job['selector'] == prop["selector"] for job in authjob["continuous"]):
+                            authjob["continuous"] = [job for job in authjob["continuous"] if
+                                                     job['selector'] != prop["selector"]]
+                            updated = True
 
                 # elif any(job['selector'] == prop["selector"] for job in authjob[prop["type"]]) and not prop["active"]:
                 #     authjob[prop["type"]] = [job for job in authjob[prop["type"]] if job['selector'] != prop["selector"]]
@@ -439,8 +441,8 @@ if __name__ == "__main__":
     app.config["DEBUG"] = False
 
 
-    @app.route("/authentication", methods=["GET"])
-    def getJobs():
+    @app.route("/authenticationjobs", methods=["GET"])
+    def getAllAuthenticationJobs():
         if col_cpps.count_documents({}):
             results = col_authjobs.find({}, {"_id": False})
             resArray = []
@@ -451,8 +453,8 @@ if __name__ == "__main__":
             return jsonify([])
 
 
-    @app.route("/authentication/<uuid>", methods=["GET"])
-    def getJobByUuid(uuid):
+    @app.route("/authenticationjobs/<uuid>", methods=["GET"])
+    def getAuthenticationJobByUuid(uuid):
         if col_authjobs.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
             result = col_authjobs.find_one(myquery, {"_id": False})
@@ -462,13 +464,18 @@ if __name__ == "__main__":
             return jsonify({})
 
 
-    @app.route("/authentication/sync", methods=["GET"])
-    def syncJobs():
-        return jsonify(checkEntitiesForAuth())
+    @app.route("/authenticationjobs/sync", methods=["GET"])
+    def synchronizeAuthenticationJob():
+        return jsonify(checkEntitiesForAuthentication())
+
+    @app.route("/authenticationjobs/drop", methods=["GET"])
+    def dropAuthenticationJobDb():
+        col_authjobs.drop()
+        return "<h1>Collection drop</h1><p>authenticationjobs dropped.</p>"
 
 
     @app.route("/", methods=["GET"])
-    def home():
+    def getHomeInfo():
         homeinfo = {
             "application": "Self-Description Property Authentication Service",
             "version": "0.1"
@@ -476,15 +483,19 @@ if __name__ == "__main__":
         return jsonify(homeinfo)
 
 
-    @app.route("/entities/sync", methods=["GET"])
-    def syncServiceCall():
-        service_count = syncEntities()
+    @app.route("/entities/sync/<uuid>", methods=["GET"])
+    def triggerEntitySynchronization(uuid):
+        print("SYNC: " + uuid)
+        if(uuid == "all"):
+            service_count = syncEntities()
+        else:
+            return str(syncEntity(uuid))
         # myclient.drop_database("sdp_authentication")
         return str(service_count)
 
 
     @app.route("/entities/drop", methods=["GET"])
-    def dropDb():
+    def dropEntityDataBase():
         myclient.drop_database("authentcation_service")
         # myclient.drop_database("sdp_authentication")
         return "<h1>DB drop</h1><p>authentcation_service dropped.</p>"
@@ -498,7 +509,7 @@ if __name__ == "__main__":
 
 
     @app.route("/entities/find", methods=["GET"])
-    def getByUuidQuery():
+    def getEntityByUuidQuery():
         # here we want to get the value of user (i.e. ?user=some-value)
         uuid = request.args.get("uuid")
         if col_cpps.count_documents({"uuid": str(uuid)}, limit=1):
@@ -508,7 +519,7 @@ if __name__ == "__main__":
             return jsonify({})
 
     @app.route("/entities/selfdescription", methods=["GET"])
-    def getSelfdescriptions():
+    def getAllEntitySelfdescriptions():
         if col_cpps_sd.count_documents({}):
             results = col_cpps_sd.find({}, {"_id": False})
             # resArray = []
@@ -519,7 +530,7 @@ if __name__ == "__main__":
             return jsonify([])
 
     @app.route("/entities/selfdescription/<uuid>", methods=["GET"])
-    def getSelfdescriptionByUuid(uuid):
+    def getEntitySelfdescriptionByUuid(uuid):
         if col_cpps_sd.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
             result = col_cpps_sd.find_one(myquery, {"_id": False})
@@ -529,7 +540,7 @@ if __name__ == "__main__":
             return jsonify({})
 
     @app.route("/entities/<uuid>", methods=["GET"])
-    def getByUuid(uuid):
+    def getEntityByUuid(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
             result = col_cpps.find_one(myquery, {"_id": False})
@@ -540,14 +551,17 @@ if __name__ == "__main__":
 
 
     @app.route("/entities/<uuid>/<path:selector>", methods=["GET", "POST"])
-    def getProperty(uuid, selector):
+    def getPropertyByUuidAndSelector(uuid, selector):
         if request.method == "GET":
-            if col_cpps.count_documents({"uuid": uuid}, limit=1):
-                myquery = {"uuid": uuid}
-                results = col_cpps.find(myquery, {"_id": False})
-                for md in results[0]["properties"]:
-                    if md["selector"] == "/" + selector:
-                        return jsonify(md)
+            sel = "/" + selector
+            if col_cpps.count_documents({"uuid": uuid, "properties.selector": sel}, limit=1):
+                # myquery = {"uuid": uuid}
+                # results = col_cpps.find(myquery, {"_id": False})
+                # for md in results[0]["properties"]:
+                #     if md["selector"] == "/" + selector:
+                #         return jsonify(md)
+                result = col_cpps.find_one({"uuid": uuid, "properties.selector": sel}, {"_id": False, "properties": {"$elemMatch": {"selector": sel}}})
+                return jsonify(result["properties"][0])
             else:
                 return jsonify({})
 
@@ -570,7 +584,7 @@ if __name__ == "__main__":
 
 
     @app.route("/entities/<uuid>/on", methods=["GET"])
-    def enableEntityAuth(uuid):
+    def enableEntityAuthentication(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             retdoc = col_cpps.find_one_and_update(
                 {"uuid": uuid},
@@ -584,7 +598,7 @@ if __name__ == "__main__":
 
 
     @app.route("/entities/<uuid>/off", methods=["GET"])
-    def disableEntityAuth(uuid):
+    def disableEntityAuthentication(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             retdoc = col_cpps.find_one_and_update(
                 {"uuid": uuid},
@@ -596,9 +610,48 @@ if __name__ == "__main__":
         else:
             return jsonify({})
 
+    @app.route("/entities/<uuid>/complex", methods=["GET", "POST"])
+    def addComplexProperty(uuid):
+        if request.method == "POST":
+
+            complex_prop = {
+                "serviceUuid": uuid,
+                "props": []
+            }
+
+            for prop in request.json:
+                complex_prop["props"].append(prop)
+
+            if col_cpps.count_documents({"uuid": uuid}, limit=1):
+                cppsEntity = col_cpps.find_one({"uuid": uuid})
+                cpropList = copy.deepcopy(cppsEntity["cproperties"])
+                cpropList.append(complex_prop)
+                retdoc = col_flows.update_one({"uuid": uuid}, {"$set": {"cproperties": cpropList}}, upsert=False, projection={"_id": False}, return_document=ReturnDocument.AFTER)
+                return jsonify(retdoc)
+            else:
+                return jsonify({})
+        elif request.method == "GET":
+            if col_cpps.count_documents({"uuid": uuid}, limit=1):
+                result = col_cpps.find_one({"uuid": uuid}, {"_id": False})
+                return jsonify(result["cproperties"])
+            else:
+                return jsonify({})
+
+    # @app.route("/entities/<uuid>/complex/<cpropid>", methods=["GET", "POST"])
+    # def addComplexProperty(uuid, cpropid):
+    #     if request.method == "POST":
+    #         return jsonify({})
+    #     elif request.method == "GET":
+    #         if col_cpps.count_documents({"uuid": uuid}, limit=1):
+    #             result = col_cpps.find_one({"uuid": uuid}, {"_id": False})
+    #             return jsonify(result["cproperties"])
+    #         else:
+    #             return jsonify({})
+
+
 
     @app.route("/entities/<uuid>/<path:selector>/on", methods=["GET"])
-    def enableAuthProperty(uuid, selector):
+    def enableAuthenticationProperty(uuid, selector):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
             results = col_cpps.find(myquery, {"_id": False})
@@ -615,7 +668,7 @@ if __name__ == "__main__":
 
 
     @app.route("/entities/<uuid>/<path:selector>/off", methods=["GET"])
-    def disableAuthProperty(uuid, selector):
+    def disableAuthenticationProperty(uuid, selector):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             myquery = {"uuid": uuid}
             results = col_cpps.find(myquery, {"_id": False})
@@ -632,7 +685,7 @@ if __name__ == "__main__":
 
 
     @app.route("/entities", methods=["GET"])
-    def getEntities():
+    def getAllEntities():
         if col_cpps.count_documents({}):
             results = col_cpps.find({}, {"_id": False})
             # resArray = []
@@ -643,8 +696,8 @@ if __name__ == "__main__":
             return jsonify([])
 
 
-    @app.route("/entities/verification", methods=["GET"])
-    def getVServices():
+    @app.route("/verificationservices", methods=["GET"])
+    def getVerificationServices():
         if col_vservices.count_documents({}):
             results = col_vservices.find({}, {"_id": False})
             # resArray = []
@@ -654,13 +707,45 @@ if __name__ == "__main__":
         else:
             return jsonify([])
 
+    @app.route("/verificationservices/<uuid>", methods=["GET"])
+    def getVerificationServiceByUuid(uuid):
+        if col_vservices.count_documents({"uuid": uuid}, limit=1):
+            result = col_vservices.find_one({"uuid": uuid}, {"_id": False})
+            return jsonify(result)
+        else:
+            return jsonify({})
+
+    @app.route("/verificationservices/<uuid>/<prop>", methods=["GET"])
+    def addPropertyToVerificationService(uuid, prop):
+        if col_vservices.count_documents({"uuid": uuid}, limit=1):
+            result = col_vservices.find_one({"uuid": uuid}, {"_id": False})
+            newProps = copy.deepcopy(result["properties"])
+            newProps.append(prop)
+            updatedResult = col_vservices.find_one_and_update({"uuid": uuid},{"$set": {"properties": newProps}}, upsert=False, projection={"_id": False}, return_document=ReturnDocument.AFTER)
+            return jsonify(updatedResult)
+        else:
+            return jsonify({})
+
+    @app.route("/verificationservices/register", methods=["GET", "POST"])
+    def registerVerificationServices():
+        if request.method == "GET":
+            service_count = synchronizeVerificationServices()
+            return jsonify(service_count)
+
+        if request.method == "POST":
+            insert_result = registerVerificationService(request.json)
+            return (
+                json.dumps({"success": insert_result}),
+                200,
+                {"ContentType": "application/json"},
+            )
 
     @app.route("/entities/generate", methods=["GET"])
-    def generate():
+    def generateEntities():
         insertList = []
         insertListPrint = []
         for i in range(1, 10):
-            UUID = str(uuid.uuid4())
+            UUID = str(uuidlib.uuid4())
             authdata = {
                 "uuid": str(UUID),
                 "operationId": "OPERATION_" + str(UUID[-12:]),
@@ -675,22 +760,8 @@ if __name__ == "__main__":
         return jsonify(insertListPrint)
 
 
-    @app.route("/entities/register", methods=["GET", "POST"])
-    def register():
-        if request.method == "GET":
-            service_count = syncVerificationServices()
-            return jsonify(service_count)
-
-        if request.method == "POST":
-            insert_result = registerVerificationService(request.json)
-            return (
-                json.dumps({"success": insert_result}),
-                200,
-                {"ContentType": "application/json"},
-            )
-
     @app.route("/entities/identify/<uuid>", methods=["GET"])
-    def identifyEntityRestCall(uuid):
+    def identifyEntity(uuid):
         if col_cpps.count_documents({"uuid": uuid}, limit=1):
             requestSelfdescription(uuid)
             return jsonify({"identification_started": True})
@@ -728,9 +799,9 @@ if __name__ == "__main__":
             return jsonify([])
 
     @app.route("/flows/service/<uuid>/createIdFlow", methods=["GET"])
-    def createIdFlowRestCall(uuid):
+    def createFlowForIdentification(uuid):
         if col_flows.count_documents({"serviceUuid": uuid}):
-            resp = createIdFlow(uuid)
+            resp = createIdentificationFlow(uuid)
             # print(resp)
 
             if not isinstance(resp, int):
@@ -818,6 +889,6 @@ if __name__ == "__main__":
         return t
 
 
-    # set_interval(checkEntitiesForAuth, 5)
+    # set_interval(checkEntitiesForAuthentication2, 5)
 
     app.run(host="0.0.0.0", port=1337)

@@ -35,8 +35,8 @@ if __name__ == "__main__":
         SO_TOKEN,
     )
     #
-    # msb_url = "wss://192.168.1.9:8084"
-    msb_url = "wss://192.168.0.67:8084"
+    msb_url = "wss://192.168.1.9:8084"
+    # msb_url = "wss://192.168.0.67:8084"
 
     myMsbClient.enableDebug(True)
     myMsbClient.enableTrace(False)
@@ -70,14 +70,34 @@ if __name__ == "__main__":
     )
 
     def getCPUSpeed():
-        return "1.5 Ghz"
+        return "1.5"
 
     myMsbClient.addMetaData(
         CustomMetaData(
-            "CPU_SPEED",
+            "CPU Information",
+            "CPU Information",
+            TypeDescription(TypeDescriptor.CUSTOM, "CPU Information", "", "", ""),
+            "/CPU",
+        )
+    )
+
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "CPU_SPEED_VALUE",
             "###### Nominal CPU Speed",
-            TypeDescription(TypeDescriptor.CUSTOM, "cpu_speed", "", "/", getCPUSpeed),
-            "/",
+            TypeDescription(TypeDescriptor.CUSTOM, "cpu_speed", "", "", getCPUSpeed),
+            "/CPU/CPU_SPEED",
+            getCPUSpeed,
+            DataType.STRING,
+        )
+    )
+
+    myMsbClient.addMetaData(
+        CustomMetaData(
+            "CPU_SPEED_UNIT",
+            "Unit of CPU speed value",
+            TypeDescription(TypeDescriptor.CUSTOM, "CPU speed unit", "", "", "GHz"),
+            "/CPU/CPU_SPEED",
             getCPUSpeed,
             DataType.STRING,
         )
@@ -238,6 +258,7 @@ if __name__ == "__main__":
                 "https://cdd.iec.ch/cdd/iec61987/iec61987.nsf/ListsOfUnitsAllVersions/0112-2---61987%23ABT514",
             ),
             "/AMBIENT_TEMPERATURE",
+            "",
             DataType.DOUBLE,
         )
     )
@@ -295,6 +316,7 @@ if __name__ == "__main__":
             "CPU speed readings",
             TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_SPEED_READINGS", ""),
             "/CPU_SPEED_READINGS",
+            "",
             DataType.DOUBLE,
         )
     )
@@ -310,6 +332,7 @@ if __name__ == "__main__":
         False,
         ["CPU_SPEED_READINGS"],
     )
+
     f_cpu_speed.addMetaData(
         CustomMetaData(
             "MEASURE_CPU_SPEED",
@@ -340,6 +363,30 @@ if __name__ == "__main__":
         )
     )
 
+    e_cpu_temp_reading.addMetaData(
+        CustomMetaData(
+            "CPU temperature",
+            "CPU temperature readings for fingerprinting",
+            TypeDescription(
+                TypeDescriptor.FINGERPRINT, "FP_CPU_TEMPERATURE_READINGS", ""
+            ),
+            "/CPU_TEMPERATURE/READINGS",
+            DataType.DOUBLE,
+        )
+    )
+
+    e_cpu_temp_reading.addMetaData(
+        CustomMetaData(
+            "CPU temperature",
+            "CPU temperature readings for fingerprinting",
+            TypeDescription(
+                TypeDescriptor.FINGERPRINT, "FP_CPU_TEMPERATURE_READINGS", ""
+            ),
+            "/CPU_TEMPERATURE/READINGS/HISTORICAL",
+            DataType.DOUBLE,
+        )
+    )
+
     myMsbClient.addEvent(e_cpu_temp_reading)
 
     f_cpu_temp = Function(
@@ -353,12 +400,37 @@ if __name__ == "__main__":
     )
     f_cpu_temp.addMetaData(
         CustomMetaData(
-            "CPU_TEMPERATURE",
+            "READ_CPU_TEMPERATURE",
             "Measure CPU temperature for fingerprinting",
             TypeDescription(TypeDescriptor.FINGERPRINT, "FP_CPU_TEMPERATURE", ""),
             "/CPU_TEMPERATURE",
         )
     )
+
+    f_cpu_temp.addMetaData(
+        CustomMetaData(
+            "Unit",
+            "degree Celsius",
+            TypeDescription(TypeDescriptor.CDD, "0112/2///62720#UAA033#001", "https://cdd.iec.ch/cdd/iec61360/iec61360.nsf/Units/0112-2---62720%23UAA033"),
+            "/CPU_TEMPERATURE",
+            "°C"
+        )
+    )
+
+    f_cpu_temp.addMetaData(
+        CustomMetaData(
+            "WuselWuselName",
+            "WuselWuselDescription",
+            TypeDescription(TypeDescriptor.CUSTOM, "WuselWuselIdentifier", "WuselWuselLocation", "WuselSelector", "WuselValue"),
+            "/CPU_TEMPERATURE",
+            "WuselValue",
+            DataType.STRING,
+            False
+        )
+    )
+
+    f_cpu_temp.addMetaData(TypeDescription(TypeDescriptor.CUSTOM, "WuselWuselIdentifier", "WuselWuselLocation", "/CPU_TEMPERATURE", "WuselValue"))
+
     myMsbClient.addFunction(f_cpu_temp)
 
     f_storage_speeds = Function(
