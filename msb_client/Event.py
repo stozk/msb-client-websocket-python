@@ -84,9 +84,19 @@ class Event:
     id = 0
     dataObject = 0
 
+    def stripChar(self, char, s):
+        while char*2 in s:
+            s = s.replace(char*2, char)
+        return s
+
     def addMetaData(self, metaData):
+        if not metaData.selector.startswith("/" + self.eventId):
+            metaData.selector = "/" + self.eventId + "/" + metaData.selector
         if metaData.selector == "" or metaData.selector == "/":
             metaData.selector = "/" + self.eventId
         if not metaData.selector.startswith("/events"):
             metaData.selector = "/events" + metaData.selector
+        metaData.selector = self.stripChar("/", metaData.selector)
+        if metaData.selector[-1] == "/":
+            metaData.selector = metaData.selector[:-1]
         self.metaData.append(metaData)
